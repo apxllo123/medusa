@@ -26,5 +26,6 @@ export interface MacScreenObservationResult {
  */
 export interface MacScreenObserver {
   captureWindow(windowId?: number): Promise<MacScreenObservationResult>;
+  captureProcess(pid: number): Promise<MacScreenObservationResult>;
   captureFocusedGameWindow(): Promise<MacScreenObservationResult>;
 }
