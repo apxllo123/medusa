@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
+  MacCompatibilityDiagnosticRecord,
   MacCompatibilityExperiment,
   MacCompatibilityGameKey,
   MacCompatibilityLastKnownGood,
@@ -91,10 +92,7 @@ export class MacCompatibilityRegistry {
     return this.entries.get(this.getKey(key)) ?? null;
   }
 
-  public set(
-    key: MacCompatibilityGameKey,
-    entry: MacCompatibilityRegistryEntry
-  ): void {
+  public set(key: MacCompatibilityGameKey, entry: MacCompatibilityRegistryEntry): void {
     this.entries.set(this.getKey(key), entry);
     this.persist();
   }
@@ -135,16 +133,14 @@ export class MacCompatibilityRegistry {
       selectedStack: null,
       lastKnownGood: null,
       experiments: [],
+      diagnostics: [],
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
     });
   }
 
-  public setStatus(
-    key: MacCompatibilityGameKey,
-    status: MacCompatibilityStatus
-  ): void {
+  public setStatus(key: MacCompatibilityGameKey, status: MacCompatibilityStatus): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -164,16 +160,14 @@ export class MacCompatibilityRegistry {
       selectedStack: null,
       lastKnownGood: null,
       experiments: [],
+      diagnostics: [],
       lastStatus: status,
       lastCheckedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
   }
 
-  public setWineVersion(
-    key: MacCompatibilityGameKey,
-    wineVersionId: string | null
-  ): void {
+  public setWineVersion(key: MacCompatibilityGameKey, wineVersionId: string | null): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -192,6 +186,7 @@ export class MacCompatibilityRegistry {
       selectedStack: null,
       lastKnownGood: null,
       experiments: [],
+      diagnostics: [],
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
@@ -202,10 +197,7 @@ export class MacCompatibilityRegistry {
     return this.get(key)?.selectedStack?.id ?? null;
   }
 
-  public setSelectedStack(
-    key: MacCompatibilityGameKey,
-    stack: MacCompatibilityStack | null
-  ): void {
+  public setSelectedStack(key: MacCompatibilityGameKey, stack: MacCompatibilityStack | null): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -224,6 +216,7 @@ export class MacCompatibilityRegistry {
       selectedStack: stack,
       lastKnownGood: null,
       experiments: [],
+      diagnostics: [],
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
@@ -234,10 +227,7 @@ export class MacCompatibilityRegistry {
     return [...(this.get(key)?.experiments ?? [])];
   }
 
-  public addExperiment(
-    key: MacCompatibilityGameKey,
-    experiment: MacCompatibilityExperiment
-  ): void {
+  public addExperiment(key: MacCompatibilityGameKey, experiment: MacCompatibilityExperiment): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -256,6 +246,7 @@ export class MacCompatibilityRegistry {
       selectedStack: null,
       lastKnownGood: null,
       experiments: [experiment],
+      diagnostics: [],
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
@@ -294,6 +285,7 @@ export class MacCompatibilityRegistry {
         selectedStack: lastKnownGood.stack,
         lastKnownGood,
         experiments: [],
+        diagnostics: [],
         lastStatus: "ready",
         lastCheckedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -310,10 +302,41 @@ export class MacCompatibilityRegistry {
     });
   }
 
-  public getLastKnownGood(
-    key: MacCompatibilityGameKey
-  ): MacCompatibilityLastKnownGood | null {
+  public getLastKnownGood(key: MacCompatibilityGameKey): MacCompatibilityLastKnownGood | null {
     return this.get(key)?.lastKnownGood ?? null;
+  }
+
+  public addDiagnostic(
+    key: MacCompatibilityGameKey,
+    diagnostic: MacCompatibilityDiagnosticRecord
+  ): void {
+    const existing = this.get(key);
+
+    if (existing) {
+      this.set(key, {
+        ...existing,
+        diagnostics: [...(existing.diagnostics ?? []), diagnostic],
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    this.set(key, {
+      key,
+      environment: null,
+      selectedWineVersionId: null,
+      selectedStack: null,
+      lastKnownGood: null,
+      experiments: [],
+      diagnostics: [diagnostic],
+      lastStatus: "unknown",
+      lastCheckedAt: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public getDiagnostics(key: MacCompatibilityGameKey): MacCompatibilityDiagnosticRecord[] {
+    return [...(this.get(key)?.diagnostics ?? [])];
   }
 
   public getAll(): MacCompatibilityRegistryEntry[] {
