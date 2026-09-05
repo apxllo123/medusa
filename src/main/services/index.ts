@@ -32,5 +32,6 @@ export * from "./cloud-save";
 export * from "./achievement-notification-presenter-electron";
 export * from "./game-artwork";
 export * from "./game-artwork-cloud";
+export * from "./mac-compatibility";
 export * as emulators from "./emulators";
 export * as retroarch from "./retroarch";
