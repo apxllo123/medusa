@@ -1,15 +1,12 @@
-import type { MacScreenObservationResult, MacScreenObserver } from "./MacScreenObservationTypes.js";
+import type {
+  MacScreenObservationResult,
+  MacScreenObserver,
+} from "./MacScreenObservationTypes.js";
 import type { MacCompatibilityDiagnosticRecord } from "./MacCompatibilityTypes.js";
 
 export interface MacCompatibilityWorkingStateExpectation {
   windowTitlePatterns: RegExp[];
   fatalTextPatterns: RegExp[];
-}
-
-export interface MacCompatibilityWorkingStateResult {
-  verified: boolean;
-  reason: string;
-  observation: MacScreenObservationResult | null;
 }
 
 const DEFAULT_FATAL_PATTERNS = [
@@ -20,8 +17,8 @@ const DEFAULT_FATAL_PATTERNS = [
   /device removed/i,
   /device hung/i,
   /dxgi_error/i,
-  /d3d12/i,
-  /crash/i,
+  /d3d(?:10|11|12)[^\n]*(?:error|failed|unable|not found)/i,
+  /crash(?:ed)?/i,
 ];
 
 const EXPECTATIONS: Record<string, MacCompatibilityWorkingStateExpectation> = {
@@ -47,11 +44,6 @@ export interface MacCompatibilityWorkingStateVerifierDependencies {
   screenObserver: MacScreenObserver;
 }
 
-/**
- * Verifies an observable startup state. A spawned process by itself is never
- * treated as proof of compatibility. When ScreenCaptureKit is unavailable,
- * verification stays false so an experiment cannot be promoted incorrectly.
- */
 export class MacCompatibilityWorkingStateVerifier {
   private readonly screenObserver: MacScreenObserver;
 
@@ -107,7 +99,8 @@ export class MacCompatibilityWorkingStateVerifier {
     if (expectation.windowTitlePatterns.length === 0) {
       return {
         verified: true,
-        reason: "A live game window was captured and no fatal error evidence was visible.",
+        reason:
+          "A live game window was captured and no fatal error evidence was visible.",
         observation,
       };
     }
@@ -126,7 +119,8 @@ export class MacCompatibilityWorkingStateVerifier {
 
     return {
       verified: true,
-      reason: "Expected game window is visible and no fatal error evidence was observed.",
+      reason:
+        "Expected game window is visible and no fatal error evidence was observed.",
       observation,
     };
   }
