@@ -3,6 +3,12 @@ import type { GameShop } from "@types";
 export type MacCompatibilityPlatform = "macos";
 export type MacArchitecture = "arm64" | "x64" | "unknown";
 export type MacGraphicsApi = "d3d10" | "d3d11" | "d3d12" | "vulkan" | "opengl" | "unknown";
+export type MacCompatibilityRuntimeFamily =
+  | "wine"
+  | "apple-gptk"
+  | "crossover"
+  | "proton"
+  | "unknown";
 
 export type MacCompatibilityStatus =
   | "unknown"
@@ -45,11 +51,13 @@ export interface MacCompatibilityComponent {
   isInstalled: boolean;
   architectures: MacArchitecture[];
   supportedGraphicsApis?: MacGraphicsApi[];
+  runtimeFamily?: MacCompatibilityRuntimeFamily;
 }
 
 export interface MacCompatibilityStack {
   id: string;
   runtimeComponentId: string | null;
+  runtimeFamily?: MacCompatibilityRuntimeFamily;
   graphicsComponentId: string | null;
   toolingComponentIds: string[];
   dependencyComponentIds: string[];
@@ -124,6 +132,7 @@ export interface MacWineVersion {
   isInstalled: boolean;
   isRecommended: boolean;
   architecture: MacArchitecture | "universal";
+  runtimeFamily?: MacCompatibilityRuntimeFamily;
 }
 
 export interface MacWineEnvironment {
