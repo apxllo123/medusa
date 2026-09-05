@@ -1,4 +1,4 @@
-export type MacGraphicsApi = "d3d10" | "d3d11" | "d3d12" | "vulkan" | "opengl" | "unknown";
+import type { MacGraphicsApi } from "./MacCompatibilityTypes.js";
 
 export interface MacGameRequirements {
   graphicsApis: MacGraphicsApi[];
@@ -9,9 +9,9 @@ export interface MacGameRequirements {
 }
 
 /**
- * Verified public requirements for known titles. This catalog is intentionally
- * small and normalized; it is not the source of truth for whether a stack
- * actually works. Runtime probing remains authoritative.
+ * Verified public requirements for known titles. The catalog is intentionally
+ * normalized and small; runtime probing remains authoritative for actual
+ * compatibility.
  */
 const KNOWN_REQUIREMENTS: Record<string, MacGameRequirements> = {
   "steam:3751950": {
