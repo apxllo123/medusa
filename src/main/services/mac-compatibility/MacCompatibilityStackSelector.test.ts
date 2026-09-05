@@ -32,6 +32,19 @@ const armWine: MacWineVersion = {
   isInstalled: true,
   isRecommended: true,
   architecture: "arm64",
+  runtimeFamily: "wine",
+};
+
+const gptkWine: MacWineVersion = {
+  id: "gptk-wine",
+  name: "Game Porting Toolkit Wine",
+  version: "wine-test-gptk",
+  type: "wine",
+  executablePath: "/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/wine64",
+  isInstalled: true,
+  isRecommended: true,
+  architecture: "x64",
+  runtimeFamily: "apple-gptk",
 };
 
 const intelWine: MacWineVersion = {
@@ -43,6 +56,7 @@ const intelWine: MacWineVersion = {
   isInstalled: true,
   isRecommended: false,
   architecture: "x64",
+  runtimeFamily: "wine",
 };
 
 const metalTool: MacCompatibilityComponent = {
@@ -63,7 +77,21 @@ const dx12Backend: MacCompatibilityComponent = {
   executablePath: "/tmp/dx12-backend",
   isInstalled: true,
   architectures: ["arm64"],
+  runtimeFamily: "wine",
   supportedGraphicsApis: ["d3d12"],
+};
+
+const gptkD3DMetal: MacCompatibilityComponent = {
+  id: "apple-d3dmetal",
+  name: "Apple D3DMetal (Game Porting Toolkit)",
+  type: "graphics",
+  version: null,
+  executablePath:
+    "/Applications/Game Porting Toolkit.app/Contents/Resources/wine/lib/external/D3DMetal.framework/D3DMetal",
+  isInstalled: true,
+  architectures: ["arm64"],
+  runtimeFamily: "apple-gptk",
+  supportedGraphicsApis: ["d3d11", "d3d12"],
 };
 
 describe("MacCompatibilityStackSelector", () => {
@@ -78,9 +106,7 @@ describe("MacCompatibilityStackSelector", () => {
     assert.equal(candidates[0]?.stack.id, "wine:wine-arm");
     assert.equal(candidates[0]?.eligible, true);
     assert.ok((candidates[0]?.score ?? 0) > (candidates[1]?.score ?? 0));
-    assert.ok(
-      candidates[0]?.stack.toolingComponentIds.includes("apple-metal-compiler")
-    );
+    assert.ok(candidates[0]?.stack.toolingComponentIds.includes("apple-metal-compiler"));
   });
 
   it("does not select an incompatible runtime architecture", () => {
@@ -105,10 +131,7 @@ describe("MacCompatibilityStackSelector", () => {
 
     assert.equal(candidates[0]?.stack.confidence, null);
     assert.equal(candidates[0]?.stack.id, "wine:wine-arm");
-    assert.match(
-      candidates[0]?.reasons.join(" ") ?? "",
-      /stored preferred stack/i
-    );
+    assert.match(candidates[0]?.reasons.join(" ") ?? "", /stored preferred stack/i);
   });
 
   it("marks Black Flag Resynced ineligible when no DX12 backend exists", () => {
@@ -126,7 +149,7 @@ describe("MacCompatibilityStackSelector", () => {
     assert.match(candidates[0]?.reasons.join(" ") ?? "", /D3D12/i);
   });
 
-  it("makes a stack eligible when an installed graphics backend advertises DX12", () => {
+  it("makes a stack eligible when an installed matching graphics backend advertises DX12", () => {
     const selector = new MacCompatibilityStackSelector();
     const candidates = selector.select({
       systemInfo: system,
@@ -139,5 +162,34 @@ describe("MacCompatibilityStackSelector", () => {
     assert.equal(candidates[0]?.eligible, true);
     assert.equal(candidates[0]?.stack.graphicsComponentId, dx12Backend.id);
     assert.match(candidates[0]?.reasons.join(" ") ?? "", /supports d3d12/i);
+  });
+
+  it("allows GPTK Wine on Apple Silicon only when Rosetta is available", () => {
+    const selector = new MacCompatibilityStackSelector();
+    const candidates = selector.select({
+      systemInfo: system,
+      wineVersions: [gptkWine],
+      components: [gptkD3DMetal],
+      requirements: getMacGameRequirements("steam", "3751950"),
+    });
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.eligible, true);
+    assert.equal(candidates[0]?.stack.runtimeFamily, "apple-gptk");
+    assert.equal(candidates[0]?.stack.graphicsComponentId, "apple-d3dmetal");
+  });
+
+  it("does not pair Apple D3DMetal with ordinary Wine", () => {
+    const selector = new MacCompatibilityStackSelector();
+    const candidates = selector.select({
+      systemInfo: system,
+      wineVersions: [armWine],
+      components: [gptkD3DMetal],
+      requirements: getMacGameRequirements("steam", "3751950"),
+    });
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.eligible, false);
+    assert.equal(candidates[0]?.stack.graphicsComponentId, null);
   });
 });
