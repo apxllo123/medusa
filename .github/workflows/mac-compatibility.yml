@@ -42,8 +42,17 @@ jobs:
       - name: Compile native Mac screen observer
         run: node scripts/build-mac-screen-observer.cjs
 
+      - name: Run Mac parity audit
+        run: node scripts/mac-parity-audit.cjs
+
       - name: Run compatibility tests
         run: yarn test --test-name-pattern='MacCompatibility|MacWine|MacSystem|MacGame'
+
+      - name: Build Electron application
+        run: yarn build
+
+      - name: Build unpacked macOS application
+        run: npx electron-builder --mac --dir
 
       - name: Inspect Mac environment
         run: |
@@ -70,5 +79,16 @@ jobs:
           command -v gameportingtoolkit || true
           command -v game-porting-toolkit || true
           echo ""
+          echo "=== Packaged resources ==="
+          find dist -maxdepth 3 -type f \( -name 'Medusa' -o -name 'mac-screen-observer' \) -print 2>/dev/null || true
+          echo ""
           echo "=== Mac compatibility source ==="
           find src/main/services/mac-compatibility -maxdepth 2 -type f | sort
+
+      - name: Upload Mac parity report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-parity-audit
+          path: artifacts/mac-parity-audit.json
+          if-no-files-found: ignore
