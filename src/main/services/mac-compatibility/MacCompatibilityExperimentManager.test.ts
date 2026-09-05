@@ -3,11 +3,12 @@ import { describe, it } from "node:test";
 import type {
   MacCompatibilityExperiment,
   MacCompatibilityGameKey,
-  MacCompatibilityStack,
   MacCompatibilityRegistryEntry,
+  MacCompatibilityStack,
 } from "./MacCompatibilityTypes.ts";
 import { MacCompatibilityExperimentManager } from "./MacCompatibilityExperimentManager.ts";
 import type { MacCompatibilityRegistry } from "./MacCompatibilityRegistry.ts";
+import { MacCompatibilityResourceGuard } from "./MacCompatibilityResourceGuard.ts";
 
 const GAME: MacCompatibilityGameKey = {
   shop: "steam",
@@ -17,6 +18,7 @@ const GAME: MacCompatibilityGameKey = {
 const STACK: MacCompatibilityStack = {
   id: "wine:wine-arm64",
   runtimeComponentId: "wine-arm64",
+  runtimeFamily: "wine",
   graphicsComponentId: null,
   toolingComponentIds: [],
   dependencyComponentIds: [],
@@ -65,7 +67,9 @@ class FakeRegistry {
     this.entry = {
       ...this.entry,
       experiments: (this.entry.experiments ?? []).map((experiment) =>
-        experiment.id === experimentId ? { ...experiment, ...update } : experiment
+        experiment.id === experimentId
+          ? { ...experiment, ...update }
+          : experiment
       ),
     };
   }
@@ -85,9 +89,13 @@ describe("MacCompatibilityExperimentManager", () => {
     const manager = new MacCompatibilityExperimentManager({
       registry: registry as unknown as MacCompatibilityRegistry,
       experimentsRoot: "/tmp/medusa-experiments",
+      resourceGuard: new MacCompatibilityResourceGuard({
+        maxConcurrentExperiments: 1,
+        minimumFreeDiskBytes: 0,
+      }),
     });
 
-    const experiment = manager.start(GAME, STACK);
+    const experiment = manager.start(GAME, STACK, 100);
 
     assert.equal(experiment.status, "pending");
     assert.match(experiment.prefixPath ?? "", /black-flag-resynced-test/);
@@ -100,9 +108,13 @@ describe("MacCompatibilityExperimentManager", () => {
     const manager = new MacCompatibilityExperimentManager({
       registry: registry as unknown as MacCompatibilityRegistry,
       experimentsRoot: "/tmp/medusa-experiments",
+      resourceGuard: new MacCompatibilityResourceGuard({
+        maxConcurrentExperiments: 1,
+        minimumFreeDiskBytes: 0,
+      }),
     });
 
-    const experiment = manager.start(GAME, STACK);
+    const experiment = manager.start(GAME, STACK, 100);
     manager.markRunning(GAME, experiment.id);
     manager.markFailed(GAME, experiment.id, "DXGI_DEVICE_REMOVED", [
       "graphics initialization failed",
@@ -113,6 +125,40 @@ describe("MacCompatibilityExperimentManager", () => {
     assert.equal(saved?.failureSignature, "DXGI_DEVICE_REMOVED");
     assert.deepEqual(saved?.notes, ["graphics initialization failed"]);
     assert.ok(saved?.finishedAt);
+  });
+
+  it("blocks a second concurrent experiment", () => {
+    const registry = new FakeRegistry();
+    const manager = new MacCompatibilityExperimentManager({
+      registry: registry as unknown as MacCompatibilityRegistry,
+      experimentsRoot: "/tmp/medusa-experiments",
+      resourceGuard: new MacCompatibilityResourceGuard({
+        maxConcurrentExperiments: 1,
+        minimumFreeDiskBytes: 0,
+      }),
+    });
+
+    manager.start(GAME, STACK, 100);
+
+    assert.throws(() => manager.start(GAME, STACK, 100), /resource safety budget/i);
+  });
+
+  it("releases the experiment slot when an experiment finishes", () => {
+    const registry = new FakeRegistry();
+    const manager = new MacCompatibilityExperimentManager({
+      registry: registry as unknown as MacCompatibilityRegistry,
+      experimentsRoot: "/tmp/medusa-experiments",
+      resourceGuard: new MacCompatibilityResourceGuard({
+        maxConcurrentExperiments: 1,
+        minimumFreeDiskBytes: 0,
+      }),
+    });
+
+    const first = manager.start(GAME, STACK, 100);
+    manager.markFailed(GAME, first.id, "FAILED");
+
+    const second = manager.start(GAME, STACK, 100);
+    assert.equal(second.status, "pending");
   });
 
   it("does not report a last-known-good configuration unless one exists", () => {
