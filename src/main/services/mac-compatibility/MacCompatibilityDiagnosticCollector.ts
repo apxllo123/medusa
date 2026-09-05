@@ -1,3 +1,5 @@
+import type { MacScreenObservationResult } from "./MacScreenObservationTypes.js";
+
 export interface MacCompatibilityDiagnosticEvidence {
   source: "process" | "runtime" | "screen" | "system";
   text: string;
@@ -16,12 +18,6 @@ export interface MacCompatibilityDiagnosticRecord {
 const ANSI_ESCAPE_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const WHITESPACE_PATTERN = /\s+/g;
 
-/**
- * Normalizes noisy process/runtime output into a stable signature that can
- * be persisted on a game profile and compared across launches. The
- * diagnostic layer deliberately does not claim that a signature identifies
- * the fix; it only makes repeated failures recognizable.
- */
 export function normalizeDiagnosticSignature(text: string): string | null {
   const normalized = text
     .replace(ANSI_ESCAPE_PATTERN, " ")
@@ -31,10 +27,7 @@ export function normalizeDiagnosticSignature(text: string): string | null {
     .trim()
     .toUpperCase();
 
-  if (normalized.length === 0) {
-    return null;
-  }
-
+  if (normalized.length === 0) return null;
   return normalized.slice(0, 1_000);
 }
 
@@ -45,7 +38,6 @@ export function createDiagnosticRecord(
     .map((item) => item.text.trim())
     .filter(Boolean)
     .join("\n");
-
   const failureSignature = normalizeDiagnosticSignature(text);
 
   const summary =
@@ -64,11 +56,6 @@ export function createDiagnosticRecord(
   };
 }
 
-/**
- * Parses a process result into the same evidence shape that future screen
- * capture and system telemetry collectors will use. Keeping this normalized
- * now lets the autonomous recovery loop reason over one record type.
- */
 export function createProcessDiagnosticEvidence(
   stdout: string,
   stderr: string
@@ -84,7 +71,6 @@ export function createProcessDiagnosticEvidence(
       confidence: 1,
     });
   }
-
   if (stderr.trim()) {
     evidence.push({
       source: "runtime",
@@ -95,4 +81,23 @@ export function createProcessDiagnosticEvidence(
   }
 
   return evidence;
+}
+
+export function createScreenDiagnosticEvidence(
+  observation: MacScreenObservationResult
+): MacCompatibilityDiagnosticEvidence[] {
+  if (!observation.captured || !observation.combinedText.trim()) return [];
+
+  return [
+    {
+      source: "screen",
+      text: observation.combinedText,
+      timestamp: new Date().toISOString(),
+      confidence: observation.observations.length
+        ? Math.max(
+            ...observation.observations.map((item) => item.confidence)
+          )
+        : 0.5,
+    },
+  ];
 }
