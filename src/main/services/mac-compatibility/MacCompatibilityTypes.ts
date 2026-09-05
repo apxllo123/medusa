@@ -84,7 +84,7 @@ export interface MacSystemInfo {
   protonAvailable: boolean;
   rosettaAvailable: boolean;
   /** Components positively discovered on the host for compatibility selection. */
-  compatibilityComponents: MacCompatibilityComponent[];
+  compatibilityComponents?: MacCompatibilityComponent[];
 }
 
 export interface MacWineVersion {
