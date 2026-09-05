@@ -2,6 +2,7 @@ import type { GameShop } from "@types";
 
 export type MacCompatibilityPlatform = "macos";
 export type MacArchitecture = "arm64" | "x64" | "unknown";
+export type MacGraphicsApi = "d3d10" | "d3d11" | "d3d12" | "vulkan" | "opengl" | "unknown";
 
 export type MacCompatibilityStatus =
   | "unknown"
@@ -43,6 +44,7 @@ export interface MacCompatibilityComponent {
   executablePath: string | null;
   isInstalled: boolean;
   architectures: MacArchitecture[];
+  supportedGraphicsApis?: MacGraphicsApi[];
 }
 
 export interface MacCompatibilityStack {
