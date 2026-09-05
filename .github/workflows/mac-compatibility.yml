@@ -85,14 +85,6 @@ jobs:
           echo "=== Mac compatibility source ==="
           find src/main/services/mac-compatibility -maxdepth 2 -type f | sort
 
-      - name: Upload unpacked Mac app
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: medusa-macos-arm64-unpacked
-          path: dist/mac-arm64
-          if-no-files-found: error
-
       - name: Upload Mac parity report
         uses: actions/upload-artifact@v4
         if: always()

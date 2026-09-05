@@ -255,8 +255,7 @@ export function SettingsContextDownloads() {
         />
 
         {(window.electron.platform === "win32" ||
-          window.electron.platform === "linux" ||
-          window.electron.platform === "darwin") && (
+          window.electron.platform === "linux") && (
           <CheckboxField
             label={t("create_shortcuts_on_download")}
             checked={form.createStartMenuShortcut}
