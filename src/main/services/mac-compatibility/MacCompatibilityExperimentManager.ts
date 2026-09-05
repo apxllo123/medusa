@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type {
+  MacCompatibilityDiagnosticRecord,
   MacCompatibilityExperiment,
   MacCompatibilityGameKey,
   MacCompatibilityStack,
@@ -154,6 +155,17 @@ export class MacCompatibilityExperimentManager {
       stack,
       notes: [...experiment.notes, ...verificationNotes],
     };
+  }
+
+  addDiagnostic(
+    game: MacCompatibilityGameKey,
+    diagnostic: MacCompatibilityDiagnosticRecord
+  ): void {
+    this.registry.addDiagnostic(game, diagnostic);
+  }
+
+  getDiagnostics(game: MacCompatibilityGameKey): MacCompatibilityDiagnosticRecord[] {
+    return this.registry.getDiagnostics(game);
   }
 
   getExperiments(game: MacCompatibilityGameKey): MacCompatibilityExperiment[] {
