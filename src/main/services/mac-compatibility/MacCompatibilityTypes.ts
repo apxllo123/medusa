@@ -83,11 +83,8 @@ export interface MacSystemInfo {
   wineAvailable: boolean;
   protonAvailable: boolean;
   rosettaAvailable: boolean;
-  /**
-   * Positively discovered developer/compatibility components. Optional
-   * so legacy system-info consumers remain source compatible.
-   */
-  compatibilityComponents?: MacCompatibilityComponent[];
+  /** Components positively discovered on the host for compatibility selection. */
+  compatibilityComponents: MacCompatibilityComponent[];
 }
 
 export interface MacWineVersion {
@@ -129,8 +126,8 @@ export interface MacGameCompatibility {
   recommendedWineVersionName: string | null;
   environment: MacWineEnvironment | null;
   /**
-   * Generic stack selected by future backend selection logic. Optional for
-   * backwards compatibility while existing Wine-only consumers migrate.
+   * Generic stack selected by backend selection logic. Optional for backwards
+   * compatibility while existing Wine-only consumers migrate.
    */
   compatibilityStack?: MacCompatibilityStack | null;
   issues: MacCompatibilityIssue[];
@@ -197,10 +194,7 @@ export interface MacCompatibilityRegistryEntry {
   key: MacCompatibilityGameKey;
   environment: MacWineEnvironment | null;
   selectedWineVersionId: string | null;
-  /**
-   * Generic stack selection is optional until the compatibility manager
-   * begins persisting the new stack model.
-   */
+  /** Generic stack selection persisted alongside legacy Wine state. */
   selectedStack?: MacCompatibilityStack | null;
   lastStatus: MacCompatibilityStatus;
   lastCheckedAt: string | null;
