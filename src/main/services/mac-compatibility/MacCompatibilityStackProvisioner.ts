@@ -1,10 +1,10 @@
 import type {
-  MacCompatibilityStack,
-  MacCompatibilityStackCandidate,
   MacCompatibilityGameKey,
+  MacCompatibilityStack,
   MacWineEnvironment,
   MacWineVersion,
 } from "./MacCompatibilityTypes.js";
+import type { MacCompatibilityStackCandidate } from "./MacCompatibilityStackSelector.js";
 import { MacWineEnvironmentManager } from "./environment/MacWineEnvironmentManager.js";
 
 /**
