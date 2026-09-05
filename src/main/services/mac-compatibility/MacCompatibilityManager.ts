@@ -1,6 +1,7 @@
 import type {
   MacCompatibilityCheckResult,
   MacCompatibilityGameKey,
+  MacCompatibilityStackCandidate,
   MacGameCompatibility,
   MacSystemInfo,
   MacWineEnvironment,
@@ -9,6 +10,7 @@ import type {
 import { MacCompatibilityRegistry } from "./MacCompatibilityRegistry.js";
 import { MacSystemDetector } from "./MacSystemDetector.js";
 import { MacWineDetector } from "./MacWineDetector.js";
+import { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
 import {
   MacWineEnvironmentManager,
   MacWineEnvironmentRepairer,
@@ -20,6 +22,7 @@ export interface MacCompatibilityManagerDependencies {
   registry?: MacCompatibilityRegistry;
   environmentManager?: MacWineEnvironmentManager;
   environmentRepairer?: MacWineEnvironmentRepairer;
+  stackSelector?: MacCompatibilityStackSelector;
 }
 
 export class MacCompatibilityManager {
@@ -28,6 +31,7 @@ export class MacCompatibilityManager {
   private readonly registry: MacCompatibilityRegistry;
   private readonly environmentManager: MacWineEnvironmentManager;
   private readonly environmentRepairer: MacWineEnvironmentRepairer;
+  private readonly stackSelector: MacCompatibilityStackSelector;
 
   // Optional-param DI, matching the pattern already used by
   // MacGameLaunchManager: every dependency defaults to the real
@@ -43,6 +47,8 @@ export class MacCompatibilityManager {
       dependencies?.environmentManager ?? new MacWineEnvironmentManager();
     this.environmentRepairer =
       dependencies?.environmentRepairer ?? new MacWineEnvironmentRepairer();
+    this.stackSelector =
+      dependencies?.stackSelector ?? new MacCompatibilityStackSelector();
   }
 
   async getSystemInfo(): Promise<MacSystemInfo> {
@@ -63,6 +69,21 @@ export class MacCompatibilityManager {
     return this.environmentManager.getEnvironment(game);
   }
 
+  async selectCompatibilityStacks(
+    game: MacCompatibilityGameKey
+  ): Promise<MacCompatibilityStackCandidate[]> {
+    const systemInfo = await this.getSystemInfo();
+    const wineVersions = await this.getWineVersions();
+    const preferredStackId = this.registry.get(game)?.selectedStack?.id ?? null;
+
+    return this.stackSelector.select({
+      systemInfo,
+      wineVersions,
+      components: systemInfo.compatibilityComponents ?? [],
+      preferredStackId,
+    });
+  }
+
   async checkGame(
     game: MacCompatibilityGameKey,
     title: string,
@@ -70,6 +91,15 @@ export class MacCompatibilityManager {
   ): Promise<MacGameCompatibility> {
     const systemInfo = await this.getSystemInfo();
     const wineVersions = await this.getWineVersions();
+    const stackCandidates = isWindowsGame
+      ? this.stackSelector.select({
+          systemInfo,
+          wineVersions,
+          components: systemInfo.compatibilityComponents ?? [],
+          preferredStackId: this.registry.get(game)?.selectedStack?.id ?? null,
+        })
+      : [];
+    const selectedStack = stackCandidates[0]?.stack ?? null;
 
     const issues: MacGameCompatibility["issues"] = [];
     const recommendations: MacGameCompatibility["recommendations"] = [];
@@ -88,6 +118,7 @@ export class MacCompatibilityManager {
         recommendedWineVersionId: null,
         recommendedWineVersionName: null,
         environment: null,
+        compatibilityStack: null,
         issues,
         recommendations,
       };
@@ -136,6 +167,17 @@ export class MacCompatibilityManager {
       });
     }
 
+    if (stackCandidates.length === 0 && recommendedWine) {
+      recommendations.push({
+        id: "no-compatible-stack",
+        title: "No verified compatibility stack is currently available",
+        description:
+          "Medusa found a Wine runtime, but no stack candidate matched the detected host architecture. A different runtime or backend will be needed.",
+        action: "change-wine",
+        priority: "high",
+      });
+    }
+
     if (environment && !environment.healthy) {
       issues.push({
         id: "environment-unhealthy",
@@ -160,25 +202,24 @@ export class MacCompatibilityManager {
 
     let status: MacGameCompatibility["status"] = "needs_setup";
     let level: MacGameCompatibility["level"] = "poor";
-    let score = 25;
+    let score = selectedStack?.confidence ?? null;
 
     // An existing environment's health always takes precedence over
     // Wine availability: a healthy environment is ready, and an
     // unhealthy one needs repair regardless of whether a recommended
     // Wine version happens to be installed. Only the "no environment
-    // at all" case falls through to needs_setup, and recommendedWine
-    // is only allowed to influence level/score there, never status.
+    // at all" case falls through to needs_setup.
     if (environment?.healthy) {
       status = "ready";
       level = "good";
-      score = 85;
+      score = Math.max(score ?? 0, 85);
     } else if (environment && !environment.healthy) {
       status = "needs_repair";
       level = "poor";
-      score = recommendedWine ? 40 : 25;
-    } else if (recommendedWine) {
+      score = selectedStack ? Math.max(stackCandidates[0].score, 40) : 25;
+    } else if (selectedStack) {
       level = "good";
-      score = 70;
+      score = stackCandidates[0].score;
     }
 
     const result: MacGameCompatibility = {
@@ -194,6 +235,7 @@ export class MacCompatibilityManager {
       recommendedWineVersionId: recommendedWine?.id ?? null,
       recommendedWineVersionName: recommendedWine?.name ?? null,
       environment,
+      compatibilityStack: selectedStack,
       issues,
       recommendations,
     };
@@ -202,6 +244,17 @@ export class MacCompatibilityManager {
 
     if (recommendedWine) {
       this.registry.setWineVersion(game, recommendedWine.id);
+    }
+
+    if (selectedStack) {
+      const existing = this.registry.get(game);
+      if (existing) {
+        this.registry.set(game, {
+          ...existing,
+          selectedStack,
+          updatedAt: new Date().toISOString(),
+        });
+      }
     }
 
     return result;
