@@ -9,12 +9,14 @@ export {
   normalizeDiagnosticSignature,
 } from "./MacCompatibilityDiagnosticCollector.js";
 export { MacCompatibilityExperimentManager } from "./MacCompatibilityExperimentManager.js";
+export { MacCompatibilityRecoveryEngine } from "./MacCompatibilityRecoveryEngine.js";
 export { MacCompatibilityRecoveryPlanner } from "./MacCompatibilityRecoveryPlanner.js";
 export { MacCompatibilityResourceGuard } from "./MacCompatibilityResourceGuard.js";
 export { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
 export { MacCompatibilityStackProvisioner } from "./MacCompatibilityStackProvisioner.js";
 export { MacScreenObserverProcessClient } from "./MacScreenObserverProcessClient.js";
 export { MacCompatibilityProcessLogger } from "./MacCompatibilityProcessLogger.js";
+export { MacCompatibilityWorkingStateVerifier } from "./MacCompatibilityWorkingStateVerifier.js";
 export { MacGameManager } from "./MacGameManager.js";
 export { MacSystemDetector } from "./MacSystemDetector.js";
 export { MacWineDetector } from "./MacWineDetector.js";
@@ -76,6 +78,11 @@ export type {
   MacCompatibilityAnalysis,
   MacCompatibilityAnalyzerDependencies,
 } from "./MacCompatibilityAnalyzer.js";
+export type {
+  MacCompatibilityRecoveryAttempt,
+  MacCompatibilityRecoveryRequest,
+  MacCompatibilityRecoveryResult,
+} from "./MacCompatibilityRecoveryEngine.js";
 export type { MacCompatibilityRecoveryCandidate } from "./MacCompatibilityRecoveryPlanner.js";
 export type { MacCompatibilityResourceBudget } from "./MacCompatibilityResourceGuard.js";
 export type { MacGameRequirements } from "./MacGameRequirementsCatalog.js";
