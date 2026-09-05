@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import type {
   MacCompatibilityGameKey,
   MacCompatibilityRegistryEntry,
+  MacCompatibilityStack,
   MacCompatibilityStatus,
   MacWineEnvironment,
 } from "./MacCompatibilityTypes.js";
@@ -32,9 +33,7 @@ export class MacCompatibilityRegistry {
   private readonly entries = new Map<string, MacCompatibilityRegistryEntry>();
   private readonly registryPath: string;
 
-  /**
-   * Serializes background writes so disk order matches call order.
-   */
+  /** Serializes background writes so disk order matches call order. */
   private persistQueue: Promise<void> = Promise.resolve();
 
   constructor(
@@ -74,23 +73,10 @@ export class MacCompatibilityRegistry {
         }
       }
     } catch {
-      // No registry yet, or it's corrupted — start empty rather than
-      // crash. It will be recreated on the next write.
+      // No registry yet, or it's corrupted — start empty rather than crash.
     }
   }
 
-  /**
-   * Queues one atomic write of the current state.
-   *
-   * Two problems are fixed here. Ordering: these writes used to be
-   * started in parallel and whichever finished last won, so a stale
-   * snapshot could overwrite a newer one. Each write now waits for the
-   * previous one, so the file ends up matching the last call. Atomicity:
-   * writing directly over registry.json meant an interrupted write left
-   * a truncated file that fails to parse on the next start, wiping every
-   * game's saved status. The data now goes to a temporary file in the
-   * same folder and is renamed over the real one, which is atomic.
-   */
   private persist(): void {
     const contents = JSON.stringify(Array.from(this.entries.values()), null, 2);
 
@@ -99,9 +85,6 @@ export class MacCompatibilityRegistry {
       () => this.writeAtomically(contents)
     );
 
-    // Fire-and-forget by design (see class-level comment), but a failure
-    // must not poison the queue for later writes, and must not become an
-    // unhandled rejection.
     this.persistQueue = this.persistQueue.catch((error) => {
       console.error(
         "[MacCompatibilityRegistry] Failed to persist registry:",
@@ -124,10 +107,6 @@ export class MacCompatibilityRegistry {
     }
   }
 
-  /**
-   * Waits for every queued write to reach disk. Call before quitting if
-   * the very last status change must survive.
-   */
   public async flush(): Promise<void> {
     await this.persistQueue;
   }
@@ -237,6 +216,39 @@ export class MacCompatibilityRegistry {
       key,
       environment: null,
       selectedWineVersionId: wineVersionId,
+      lastStatus: "unknown",
+      lastCheckedAt: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public getSelectedStackId(
+    key: MacCompatibilityGameKey
+  ): string | null {
+    return this.get(key)?.selectedStack?.id ?? null;
+  }
+
+  public setSelectedStack(
+    key: MacCompatibilityGameKey,
+    stack: MacCompatibilityStack | null
+  ): void {
+    const existing = this.get(key);
+
+    if (existing) {
+      this.set(key, {
+        ...existing,
+        selectedStack: stack,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return;
+    }
+
+    this.set(key, {
+      key,
+      environment: null,
+      selectedWineVersionId: stack?.runtimeComponentId ?? null,
+      selectedStack: stack,
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
