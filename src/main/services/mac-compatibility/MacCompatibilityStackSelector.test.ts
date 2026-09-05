@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.ts";
+import { getMacGameRequirements } from "./MacGameRequirementsCatalog.ts";
 import type {
   MacCompatibilityComponent,
   MacSystemInfo,
@@ -54,6 +55,17 @@ const metalTool: MacCompatibilityComponent = {
   architectures: ["arm64", "x64"],
 };
 
+const dx12Backend: MacCompatibilityComponent = {
+  id: "test-dx12-backend",
+  name: "Test DX12 graphics backend",
+  type: "graphics",
+  version: "test",
+  executablePath: "/tmp/dx12-backend",
+  isInstalled: true,
+  architectures: ["arm64"],
+  supportedGraphicsApis: ["d3d12"],
+};
+
 describe("MacCompatibilityStackSelector", () => {
   it("prefers a recommended architecture-matching runtime", () => {
     const selector = new MacCompatibilityStackSelector();
@@ -64,8 +76,11 @@ describe("MacCompatibilityStackSelector", () => {
     });
 
     assert.equal(candidates[0]?.stack.id, "wine:wine-arm");
+    assert.equal(candidates[0]?.eligible, true);
     assert.ok((candidates[0]?.score ?? 0) > (candidates[1]?.score ?? 0));
-    assert.ok(candidates[0]?.stack.toolingComponentIds.includes("apple-metal-compiler"));
+    assert.ok(
+      candidates[0]?.stack.toolingComponentIds.includes("apple-metal-compiler")
+    );
   });
 
   it("does not select an incompatible runtime architecture", () => {
@@ -90,6 +105,39 @@ describe("MacCompatibilityStackSelector", () => {
 
     assert.equal(candidates[0]?.stack.confidence, null);
     assert.equal(candidates[0]?.stack.id, "wine:wine-arm");
-    assert.match(candidates[0]?.reasons.join(" ") ?? "", /stored preferred stack/i);
+    assert.match(
+      candidates[0]?.reasons.join(" ") ?? "",
+      /stored preferred stack/i
+    );
+  });
+
+  it("marks Black Flag Resynced ineligible when no DX12 backend exists", () => {
+    const selector = new MacCompatibilityStackSelector();
+    const candidates = selector.select({
+      systemInfo: system,
+      wineVersions: [armWine],
+      components: [],
+      requirements: getMacGameRequirements("steam", "3751950"),
+    });
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.eligible, false);
+    assert.equal(candidates[0]?.stack.graphicsComponentId, null);
+    assert.match(candidates[0]?.reasons.join(" ") ?? "", /D3D12/i);
+  });
+
+  it("makes a stack eligible when an installed graphics backend advertises DX12", () => {
+    const selector = new MacCompatibilityStackSelector();
+    const candidates = selector.select({
+      systemInfo: system,
+      wineVersions: [armWine],
+      components: [dx12Backend],
+      requirements: getMacGameRequirements("steam", "3751950"),
+    });
+
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.eligible, true);
+    assert.equal(candidates[0]?.stack.graphicsComponentId, dx12Backend.id);
+    assert.match(candidates[0]?.reasons.join(" ") ?? "", /supports d3d12/i);
   });
 });
