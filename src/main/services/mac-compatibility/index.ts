@@ -9,6 +9,7 @@ export {
 } from "./MacCompatibilityDiagnosticCollector.js";
 export { MacCompatibilityExperimentManager } from "./MacCompatibilityExperimentManager.js";
 export { MacCompatibilityRecoveryPlanner } from "./MacCompatibilityRecoveryPlanner.js";
+export { MacCompatibilityResourceGuard } from "./MacCompatibilityResourceGuard.js";
 export { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
 export { MacCompatibilityStackProvisioner } from "./MacCompatibilityStackProvisioner.js";
 export { MacGameManager } from "./MacGameManager.js";
@@ -42,7 +43,6 @@ export type {
   MacCompatibilityGameKey,
   MacCompatibilityIssue,
   MacCompatibilityLastKnownGood,
-  MacCompatibilityLevel,
   MacCompatibilityOperationProgress,
   MacCompatibilityOperationResult,
   MacCompatibilityPlatform,
@@ -74,6 +74,9 @@ export type {
   MacCompatibilityAnalyzerDependencies,
 } from "./MacCompatibilityAnalyzer.js";
 export type { MacCompatibilityRecoveryCandidate } from "./MacCompatibilityRecoveryPlanner.js";
+export type {
+  MacCompatibilityResourceBudget,
+} from "./MacCompatibilityResourceGuard.js";
 export type { MacGameRequirements } from "./MacGameRequirementsCatalog.js";
 export { getMacGameRequirements } from "./MacGameRequirementsCatalog.js";
 
