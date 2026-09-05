@@ -29,11 +29,6 @@ export type MacWineType =
   | "proton-ge"
   | "unknown";
 
-/**
- * Generic compatibility component categories. Wine remains a runtime
- * component, while graphics translation, optional tooling, and supporting
- * dependencies can be represented independently.
- */
 export type MacCompatibilityComponentType =
   | "runtime"
   | "graphics"
@@ -50,10 +45,6 @@ export interface MacCompatibilityComponent {
   architectures: MacArchitecture[];
 }
 
-/**
- * A complete compatibility stack is assembled from independently
- * selectable components instead of treating Wine as the whole stack.
- */
 export interface MacCompatibilityStack {
   id: string;
   runtimeComponentId: string | null;
@@ -62,6 +53,23 @@ export interface MacCompatibilityStack {
   dependencyComponentIds: string[];
   confidence: number | null;
   verified: boolean;
+}
+
+export interface MacCompatibilityExperiment {
+  id: string;
+  stack: MacCompatibilityStack;
+  status: "pending" | "running" | "passed" | "failed" | "cancelled";
+  prefixPath: string | null;
+  failureSignature: string | null;
+  notes: string[];
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface MacCompatibilityLastKnownGood {
+  stack: MacCompatibilityStack;
+  verifiedAt: string;
+  experimentId: string;
 }
 
 export type MacCompatibilityAction =
@@ -83,7 +91,6 @@ export interface MacSystemInfo {
   wineAvailable: boolean;
   protonAvailable: boolean;
   rosettaAvailable: boolean;
-  /** Components positively discovered on the host for compatibility selection. */
   compatibilityComponents?: MacCompatibilityComponent[];
 }
 
@@ -125,10 +132,6 @@ export interface MacGameCompatibility {
   recommendedWineVersionId: string | null;
   recommendedWineVersionName: string | null;
   environment: MacWineEnvironment | null;
-  /**
-   * Generic stack selected by backend selection logic. Optional for backwards
-   * compatibility while existing Wine-only consumers migrate.
-   */
   compatibilityStack?: MacCompatibilityStack | null;
   issues: MacCompatibilityIssue[];
   recommendations: MacCompatibilityRecommendation[];
@@ -194,8 +197,9 @@ export interface MacCompatibilityRegistryEntry {
   key: MacCompatibilityGameKey;
   environment: MacWineEnvironment | null;
   selectedWineVersionId: string | null;
-  /** Generic stack selection persisted alongside legacy Wine state. */
   selectedStack?: MacCompatibilityStack | null;
+  lastKnownGood?: MacCompatibilityLastKnownGood | null;
+  experiments?: MacCompatibilityExperiment[];
   lastStatus: MacCompatibilityStatus;
   lastCheckedAt: string | null;
   updatedAt: string;
