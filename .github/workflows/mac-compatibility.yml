@@ -54,6 +54,9 @@ jobs:
       - name: Build unpacked macOS application
         run: npx electron-builder --mac --dir
 
+      - name: Audit packaged Mac resources
+        run: node scripts/mac-resource-audit.cjs
+
       - name: Inspect Mac environment
         run: |
           set -euo pipefail
@@ -80,15 +83,25 @@ jobs:
           command -v game-porting-toolkit || true
           echo ""
           echo "=== Packaged resources ==="
-          find dist -maxdepth 3 -type f \( -name 'Medusa' -o -name 'mac-screen-observer' \) -print 2>/dev/null || true
+          find dist -maxdepth 5 -type f \( -name 'Medusa' -o -name 'mac-screen-observer' -o -name '7zz' -o -name 'hydra-python-rpc' \) -print 2>/dev/null || true
           echo ""
           echo "=== Mac compatibility source ==="
           find src/main/services/mac-compatibility -maxdepth 2 -type f | sort
 
-      - name: Upload Mac parity report
+      - name: Upload unpacked Mac app
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: medusa-macos-arm64-unpacked
+          path: dist/mac-arm64
+          if-no-files-found: error
+
+      - name: Upload Mac parity reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mac-parity-audit
-          path: artifacts/mac-parity-audit.json
+          name: mac-parity-reports
+          path: |
+            artifacts/mac-parity-audit.json
+            artifacts/mac-resource-audit.json
           if-no-files-found: ignore
