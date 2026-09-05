@@ -1,18 +1,15 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access, constants } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import type {
   MacArchitecture,
   MacCompatibilityComponent,
+  MacCompatibilityRuntimeFamily,
 } from "./MacCompatibilityTypes.js";
 
 const execFileAsync = promisify(execFile);
-
-/**
- * Component discovery must never block game launch indefinitely. These
- * probes are intentionally small and only establish that a tool is
- * actually callable; they do not claim that a backend can run a game.
- */
 const COMMAND_TIMEOUT_MS = 5_000;
 
 export type CompatibilityCommandRunner = (
@@ -27,7 +24,6 @@ const defaultCommandRunner: CompatibilityCommandRunner = async (
   const { stdout, stderr } = await execFileAsync(file, args, {
     timeout: COMMAND_TIMEOUT_MS,
   });
-
   return `${stdout}\n${stderr}`.trim();
 };
 
@@ -40,13 +36,16 @@ interface ToolCandidate {
   architectures: MacArchitecture[];
 }
 
-/**
- * Only tools that can be positively located are reported. In particular,
- * D3DMetal and DXMT are not inferred from generic DLL names: Wine prefixes
- * commonly contain d3d11/dxgi files even when those files are not provided
- * by either backend. Backend-specific artifact detection will be added
- * once Medusa owns a precise installation layout for those components.
- */
+interface GraphicsArtifactCandidate {
+  id: string;
+  name: string;
+  primaryPath: string;
+  requiredPaths: string[];
+  architectures: MacArchitecture[];
+  runtimeFamily: MacCompatibilityRuntimeFamily;
+  supportedGraphicsApis: NonNullable<MacCompatibilityComponent["supportedGraphicsApis"]>;
+}
+
 const TOOL_CANDIDATES: ToolCandidate[] = [
   {
     id: "apple-metal-compiler",
@@ -90,6 +89,72 @@ const TOOL_CANDIDATES: ToolCandidate[] = [
   },
 ];
 
+const GPTK_APP_PATHS = [
+  "/Applications/Game Porting Toolkit.app",
+  join(homedir(), "Applications", "Game Porting Toolkit.app"),
+  join(homedir(), "Downloads", "Game Porting Toolkit.app"),
+];
+
+const CROSSOVER_ROOT =
+  "/Applications/CrossOver.app/Contents/SharedSupport/CrossOver";
+
+function createGraphicsCandidates(): GraphicsArtifactCandidate[] {
+  const candidates: GraphicsArtifactCandidate[] = [];
+
+  for (const appPath of GPTK_APP_PATHS) {
+    const externalPath = join(
+      appPath,
+      "Contents",
+      "Resources",
+      "wine",
+      "lib",
+      "external"
+    );
+
+    candidates.push({
+      id: "apple-d3dmetal",
+      name: "Apple D3DMetal (Game Porting Toolkit)",
+      primaryPath: join(
+        externalPath,
+        "D3DMetal.framework",
+        "D3DMetal"
+      ),
+      requiredPaths: [
+        join(externalPath, "libd3dshared.dylib"),
+        join(
+          appPath,
+          "Contents",
+          "Resources",
+          "wine",
+          "lib",
+          "x86_64-unix",
+          "d3d12.so"
+        ),
+      ],
+      architectures: ["arm64"],
+      runtimeFamily: "apple-gptk",
+      supportedGraphicsApis: ["d3d11", "d3d12"],
+    });
+  }
+
+  const crossoverExternal = join(CROSSOVER_ROOT, "lib64", "apple_gptk", "external");
+  candidates.push({
+    id: "crossover-d3dmetal",
+    name: "CrossOver D3DMetal",
+    primaryPath: join(
+      crossoverExternal,
+      "D3DMetal.framework",
+      "D3DMetal"
+    ),
+    requiredPaths: [join(crossoverExternal, "libd3dshared.dylib")],
+    architectures: ["arm64", "x64"],
+    runtimeFamily: "crossover",
+    supportedGraphicsApis: ["d3d11", "d3d12"],
+  });
+
+  return candidates;
+}
+
 export class MacCompatibilityComponentDetector {
   private readonly run: CompatibilityCommandRunner;
 
@@ -102,33 +167,23 @@ export class MacCompatibilityComponentDetector {
   async discoverInstalledComponents(
     architecture: MacArchitecture
   ): Promise<MacCompatibilityComponent[]> {
-    if (architecture === "unknown") {
-      return [];
-    }
+    if (architecture === "unknown") return [];
 
     const components: MacCompatibilityComponent[] = [];
     const seenIds = new Set<string>();
 
     for (const candidate of TOOL_CANDIDATES) {
-      if (!candidate.architectures.includes(architecture)) {
-        continue;
-      }
+      if (!candidate.architectures.includes(architecture)) continue;
 
       const executablePath = await this.findTool(candidate);
-
-      if (!executablePath) {
-        continue;
-      }
+      if (!executablePath) continue;
 
       const componentId =
         candidate.id === "apple-gptk-hyphenated"
           ? "apple-gptk"
           : candidate.id;
 
-      if (seenIds.has(componentId)) {
-        continue;
-      }
-
+      if (seenIds.has(componentId)) continue;
       seenIds.add(componentId);
 
       components.push({
@@ -142,15 +197,46 @@ export class MacCompatibilityComponentDetector {
       });
     }
 
+    for (const candidate of createGraphicsCandidates()) {
+      if (!candidate.architectures.includes(architecture)) continue;
+      if (seenIds.has(candidate.id)) continue;
+
+      const present = await this.pathsExist(
+        candidate.primaryPath,
+        candidate.requiredPaths
+      );
+
+      if (!present) continue;
+
+      seenIds.add(candidate.id);
+      components.push({
+        id: candidate.id,
+        name: candidate.name,
+        type: "graphics",
+        version: null,
+        executablePath: candidate.primaryPath,
+        isInstalled: true,
+        architectures: candidate.architectures,
+        runtimeFamily: candidate.runtimeFamily,
+        supportedGraphicsApis: candidate.supportedGraphicsApis,
+      });
+    }
+
     return components;
   }
 
-  /**
-   * Resolve through the appropriate system resolver and return only an
-   * absolute, executable path. A failed probe never creates a component;
-   * a successful location is enough to record availability because some
-   * developer tools reject --help/version in specialized environments.
-   */
+  private async pathsExist(primaryPath: string, requiredPaths: string[]): Promise<boolean> {
+    try {
+      await access(primaryPath, constants.F_OK);
+      for (const requiredPath of requiredPaths) {
+        await access(requiredPath, constants.F_OK);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async findTool(candidate: ToolCandidate): Promise<string | null> {
     try {
       const output = await this.run(
@@ -163,18 +249,10 @@ export class MacCompatibilityComponentDetector {
         .map((line) => line.trim())
         .find((line) => line.startsWith("/"));
 
-      if (!resolved) {
-        return null;
-      }
+      if (!resolved) return null;
 
       await access(resolved, constants.X_OK);
-
-      // Run the resolved executable, not the lookup command's name, so
-      // Finder-launched Electron processes do not depend on their PATH.
-      // The probe is deliberately best-effort; location + executable bit
-      // remain the availability signal.
       await this.run(resolved, candidate.probeArgs).catch(() => undefined);
-
       return resolved;
     } catch {
       return null;
