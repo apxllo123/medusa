@@ -30,7 +30,7 @@ final class Observer {
                 true,
                 onScreenWindowsOnly: true
             )
-            guard let window = try resolveWindow(content: content, windowID: windowID) else {
+            guard let window = resolveWindow(content: content, windowID: windowID) else {
                 return ObservationResult(
                     captured: false,
                     source: "none",
@@ -43,8 +43,13 @@ final class Observer {
             }
 
             let filter = SCContentFilter(desktopIndependentWindow: window)
-            let configuration = SCScreenshotConfiguration()
+            let configuration = SCStreamConfiguration()
             configuration.showsCursor = false
+            configuration.width = max(1, Int(window.frame.width.rounded()))
+            configuration.height = max(1, Int(window.frame.height.rounded()))
+            if #available(macOS 14.0, *) {
+                configuration.captureResolution = .best
+            }
 
             let image = try await SCScreenshotManager.captureImage(
                 contentFilter: filter,
@@ -87,18 +92,18 @@ final class Observer {
     private func resolveWindow(
         content: SCShareableContent,
         windowID: UInt32?
-    ) throws -> SCWindow? {
+    ) -> SCWindow? {
         if let windowID {
             return content.windows.first { $0.windowID == windowID }
         }
 
         let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        let appWindows = content.windows.filter { window in
-            guard let pid = frontmostPID else { return false }
-            return window.owningApplication?.processID == pid && !window.isHidden
-        }
+        guard let frontmostPID else { return nil }
 
-        return appWindows
+        return content.windows
+            .filter { window in
+                window.owningApplication?.processID == frontmostPID && window.isOnScreen
+            }
             .filter { $0.frame.width > 100 && $0.frame.height > 100 }
             .sorted {
                 ($0.frame.width * $0.frame.height) >
@@ -110,10 +115,7 @@ final class Observer {
     private func recognizeText(in image: CGImage) throws -> [TextObservation] {
         var results: [TextObservation] = []
         let request = VNRecognizeTextRequest { request, error in
-            if error != nil {
-                return
-            }
-
+            guard error == nil else { return }
             guard let observations = request.results as? [VNRecognizedTextObservation] else {
                 return
             }
