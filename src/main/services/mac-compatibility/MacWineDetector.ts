@@ -2,7 +2,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { access, constants, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import type {
   MacArchitecture,
   MacCompatibilityRuntimeFamily,
@@ -11,7 +11,6 @@ import type {
 } from "./MacCompatibilityTypes.js";
 
 const execFileAsync = promisify(execFile);
-
 const VERSION_TIMEOUT_MS = 15_000;
 const WHICH_TIMEOUT_MS = 5_000;
 
@@ -57,11 +56,6 @@ const GPTK_WINE_LOCATIONS = [
   },
 ];
 
-/**
- * Only real Wine-compatible executables belong here. GPTK gets its own
- * runtime family because Apple's D3DMetal payload is coupled to the Wine
- * environment shipped with the toolkit.
- */
 export const WINE_CANDIDATES: WineCandidate[] = [
   ...GPTK_WINE_LOCATIONS.map(({ id, path }) => ({
     id,
@@ -143,6 +137,11 @@ export class MacWineDetector {
       const version = await this.getWineVersion(resolvedPath);
       if (!version) continue;
 
+      const launcherPath =
+        candidate.runtimeFamily === "apple-gptk"
+          ? await this.resolveGptkLauncher(resolvedPath)
+          : null;
+
       versions.push({
         id: candidate.id,
         name: candidate.name,
@@ -153,6 +152,7 @@ export class MacWineDetector {
         isRecommended: this.isRecommended(candidate.id),
         architecture: candidate.architecture,
         runtimeFamily: candidate.runtimeFamily,
+        launcherPath,
       });
     }
 
@@ -161,6 +161,28 @@ export class MacWineDetector {
 
   async isWineAvailable(): Promise<boolean> {
     return (await this.detectInstalledVersions()).length > 0;
+  }
+
+  private async resolveGptkLauncher(wineExecutablePath: string): Promise<string | null> {
+    const candidatePaths = [
+      await this.resolveFromPath("gameportingtoolkit"),
+      await this.resolveFromPath("game-porting-toolkit"),
+      join(dirname(wineExecutablePath), "gameportingtoolkit"),
+      join(dirname(wineExecutablePath), "game-porting-toolkit"),
+      join(
+        dirname(dirname(wineExecutablePath)),
+        "..",
+        "bin",
+        "gameportingtoolkit"
+      ),
+    ].filter((candidate): candidate is string => candidate !== null);
+
+    for (const candidatePath of candidatePaths) {
+      const resolved = await this.resolveExecutable(candidatePath);
+      if (resolved) return resolved;
+    }
+
+    return null;
   }
 
   private async resolveExecutable(executablePath: string): Promise<string | null> {
@@ -199,7 +221,6 @@ export class MacWineDetector {
         ["--version"],
         { timeout: VERSION_TIMEOUT_MS }
       );
-
       const output = `${stdout}\n${stderr}`.trim();
       const firstLine = output.split("\n")[0]?.trim() ?? "";
       return WINE_VERSION_PATTERN.test(firstLine) ? firstLine : null;
