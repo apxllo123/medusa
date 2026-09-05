@@ -1,14 +1,19 @@
 import type {
   MacCompatibilityGameKey,
-  MacCompatibilityStackCandidate,
   MacSystemInfo,
   MacWineVersion,
 } from "./MacCompatibilityTypes.js";
 import { MacCompatibilityRegistry } from "./MacCompatibilityRegistry.js";
-import { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
+import {
+  MacCompatibilityStackSelector,
+  type MacCompatibilityStackCandidate,
+} from "./MacCompatibilityStackSelector.js";
 import { MacSystemDetector } from "./MacSystemDetector.js";
 import { MacWineDetector } from "./MacWineDetector.js";
-import { getMacGameRequirements, type MacGameRequirements } from "./MacGameRequirementsCatalog.js";
+import {
+  getMacGameRequirements,
+  type MacGameRequirements,
+} from "./MacGameRequirementsCatalog.js";
 
 export interface MacCompatibilityAnalysis {
   systemInfo: MacSystemInfo;
@@ -26,8 +31,8 @@ export interface MacCompatibilityAnalyzerDependencies {
 }
 
 /**
- * Single read-only analysis pass used by future provisioning/launch/recovery
- * orchestration. It does not mutate the game or filesystem.
+ * Single read-only analysis pass used by future provisioning, launch, and
+ * recovery orchestration. It does not mutate the game or filesystem.
  */
 export class MacCompatibilityAnalyzer {
   private readonly systemDetector: MacSystemDetector;
@@ -36,13 +41,18 @@ export class MacCompatibilityAnalyzer {
   private readonly selector: MacCompatibilityStackSelector;
 
   constructor(dependencies?: MacCompatibilityAnalyzerDependencies) {
-    this.systemDetector = dependencies?.systemDetector ?? new MacSystemDetector();
-    this.wineDetector = dependencies?.wineDetector ?? new MacWineDetector();
+    this.systemDetector =
+      dependencies?.systemDetector ?? new MacSystemDetector();
+    this.wineDetector =
+      dependencies?.wineDetector ?? new MacWineDetector();
     this.registry = dependencies?.registry ?? new MacCompatibilityRegistry();
-    this.selector = dependencies?.selector ?? new MacCompatibilityStackSelector();
+    this.selector =
+      dependencies?.selector ?? new MacCompatibilityStackSelector();
   }
 
-  async analyze(game: MacCompatibilityGameKey): Promise<MacCompatibilityAnalysis> {
+  async analyze(
+    game: MacCompatibilityGameKey
+  ): Promise<MacCompatibilityAnalysis> {
     const systemInfo = await this.systemDetector.detect();
     const wineVersions = await this.wineDetector.detectInstalledVersions();
     const requirements = getMacGameRequirements(game.shop, game.objectId);
