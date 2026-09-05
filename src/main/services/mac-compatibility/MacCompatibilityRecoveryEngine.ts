@@ -11,7 +11,6 @@ import { MacCompatibilityWorkingStateVerifier } from "./MacCompatibilityWorkingS
 import { MacCompatibilityProcessLogger } from "./MacCompatibilityProcessLogger.js";
 import type {
   MacCompatibilityExperiment,
-  MacCompatibilityGameKey,
   MacGameCompatibility,
 } from "./MacCompatibilityTypes.js";
 import {
@@ -54,11 +53,6 @@ export interface MacCompatibilityRecoveryEngineDependencies {
   workingStateVerifier?: MacCompatibilityWorkingStateVerifier;
 }
 
-/**
- * Autonomous compatibility repair loop. It only promotes a stack after the
- * working-state verifier passes. Failed candidates remain isolated and are
- * persisted so the next run can skip known-bad configurations.
- */
 export class MacCompatibilityRecoveryEngine {
   private readonly analyzer: MacCompatibilityAnalyzer;
   private readonly provisioner: MacCompatibilityStackProvisioner;
@@ -91,7 +85,7 @@ export class MacCompatibilityRecoveryEngine {
     request: MacCompatibilityRecoveryRequest
   ): Promise<MacCompatibilityRecoveryResult> {
     const analysis = await this.analyzer.analyze(request.game);
-    const compatibility = await this.analyzerToCompatibility(request, analysis);
+    const compatibility = this.analyzerToCompatibility(request, analysis);
     const maxAttempts = Math.max(
       1,
       Math.min(request.maxAttempts ?? DEFAULT_MAX_ATTEMPTS, 10)
@@ -112,7 +106,6 @@ export class MacCompatibilityRecoveryEngine {
     });
 
     const attempts: MacCompatibilityRecoveryAttempt[] = [];
-    let selectedExperimentId: string | null = null;
 
     for (const candidate of candidateStacks.slice(0, maxAttempts)) {
       const experiment = this.experimentManager.start(
@@ -122,42 +115,139 @@ export class MacCompatibilityRecoveryEngine {
       );
       this.experimentManager.markRunning(request.game, experiment.id);
 
-      const provision = await this.provisioner.provisionIsolated(
-        request.game,
-        candidate,
-        analysis.wineVersions,
-        experiment.prefixPath ?? ""
-      );
+      try {
+        const provision = await this.provisioner.provisionIsolated(
+          request.game,
+          candidate,
+          analysis.wineVersions,
+          experiment.prefixPath ?? ""
+        );
 
-      if (!provision.success || !provision.environment) {
-        const failureSignature = provision.message.toUpperCase().slice(0, 1_000);
+        if (!provision.success || !provision.environment) {
+          const failureSignature = provision.message.toUpperCase().slice(0, 1_000);
+          this.experimentManager.markFailed(
+            request.game,
+            experiment.id,
+            failureSignature,
+            [provision.message]
+          );
+
+          attempts.push({
+            experiment,
+            launch: null,
+            verified: false,
+            reason: provision.message,
+            failureSignature,
+          });
+          continue;
+        }
+
+        const wineVersion = analysis.wineVersions.find(
+          (wine) => wine.id === candidate.stack.runtimeComponentId
+        );
+
+        if (!wineVersion) {
+          const reason = "Selected runtime disappeared during the experiment.";
+          this.experimentManager.markFailed(
+            request.game,
+            experiment.id,
+            reason.toUpperCase(),
+            [reason]
+          );
+          attempts.push({
+            experiment,
+            launch: null,
+            verified: false,
+            reason,
+            failureSignature: reason.toUpperCase(),
+          });
+          continue;
+        }
+
+        const launch = await this.launchManager.launchInCompatibilityEnvironment(
+          request,
+          compatibility,
+          provision.environment,
+          wineVersion,
+          candidate.stack
+        );
+
+        await this.delay(STARTUP_OBSERVATION_DELAY_MS);
+
+        const logEvidence = launch.logPaths
+          ? createProcessDiagnosticEvidence(
+              this.processLogger.read(launch.logPaths.stdout),
+              this.processLogger.read(launch.logPaths.stderr)
+            )
+          : [];
+        const priorDiagnostics = this.experimentManager.getDiagnostics(request.game);
+        const screenObservation = await this.workingStateVerifier.verify(
+          request.game.shop,
+          request.game.objectId,
+          priorDiagnostics
+        );
+        const screenEvidence = screenObservation.observation
+          ? createScreenDiagnosticEvidence(screenObservation.observation)
+          : [];
+        const diagnostic = createDiagnosticRecord([
+          ...logEvidence,
+          ...screenEvidence,
+        ]);
+        this.experimentManager.addDiagnostic(request.game, diagnostic);
+
+        if (launch.success && screenObservation.verified) {
+          this.experimentManager.markPassed(request.game, experiment.id, [
+            screenObservation.reason,
+          ]);
+          this.experimentManager.promoteVerified(request.game, experiment.id, [
+            "Promoted after observable game working-state verification.",
+          ]);
+
+          attempts.push({
+            experiment,
+            launch,
+            verified: true,
+            reason: screenObservation.reason,
+            failureSignature: null,
+          });
+
+          return {
+            success: true,
+            attempts,
+            selectedExperimentId: experiment.id,
+            message: "A verified compatibility stack was found and promoted.",
+          };
+        }
+
+        const failureSignature =
+          diagnostic.failureSignature ??
+          (screenObservation.reason || launch.message).toUpperCase();
+        const reason = screenObservation.reason || launch.message;
+
         this.experimentManager.markFailed(
           request.game,
           experiment.id,
           failureSignature,
-          [provision.message]
+          [reason]
         );
 
         attempts.push({
           experiment,
-          launch: null,
+          launch,
           verified: false,
-          reason: provision.message,
+          reason,
           failureSignature,
         });
-        continue;
-      }
-
-      const wineVersion = analysis.wineVersions.find(
-        (wine) => wine.id === candidate.stack.runtimeComponentId
-      );
-
-      if (!wineVersion) {
-        const reason = "Selected runtime disappeared during the experiment.";
+      } catch (error) {
+        const reason =
+          error instanceof Error
+            ? error.message
+            : "Unexpected error while running compatibility experiment.";
+        const failureSignature = reason.toUpperCase().slice(0, 1_000);
         this.experimentManager.markFailed(
           request.game,
           experiment.id,
-          reason.toUpperCase(),
+          failureSignature,
           [reason]
         );
         attempts.push({
@@ -165,97 +255,13 @@ export class MacCompatibilityRecoveryEngine {
           launch: null,
           verified: false,
           reason,
-          failureSignature: reason.toUpperCase(),
+          failureSignature,
         });
-        continue;
       }
-
-      const launch = await this.launchManager.launchInCompatibilityEnvironment(
-        request,
-        compatibility,
-        provision.environment,
-        wineVersion,
-        candidate.stack
-      );
-
-      await this.delay(STARTUP_OBSERVATION_DELAY_MS);
-
-      const logEvidence = launch.logPaths
-        ? createProcessDiagnosticEvidence(
-            this.processLogger.read(launch.logPaths.stdout),
-            this.processLogger.read(launch.logPaths.stderr)
-          )
-        : [];
-      const screenObservation =
-        await this.workingStateVerifier.verify(
-          request.game.shop,
-          request.game.objectId,
-          []
-        );
-      const screenEvidence = screenObservation.observation
-        ? createScreenDiagnosticEvidence(screenObservation.observation)
-        : [];
-      const diagnostic = createDiagnosticRecord([
-        ...logEvidence,
-        ...screenEvidence,
-      ]);
-
-      // Diagnostics are persisted even on success so future ranking has
-      // concrete evidence for why a stack worked.
-      const registry = this.experimentManager["registry"];
-      registry.addDiagnostic(request.game, diagnostic);
-
-      if (launch.success && screenObservation.verified) {
-        this.experimentManager.markPassed(request.game, experiment.id, [
-          screenObservation.reason,
-        ]);
-        this.experimentManager.promoteVerified(request.game, experiment.id, [
-          "Promoted after observable game working-state verification.",
-        ]);
-        selectedExperimentId = experiment.id;
-
-        attempts.push({
-          experiment,
-          launch,
-          verified: true,
-          reason: screenObservation.reason,
-          failureSignature: null,
-        });
-
-        return {
-          success: true,
-          attempts,
-          selectedExperimentId,
-          message: "A verified compatibility stack was found and promoted.",
-        };
-      }
-
-      const failureSignature =
-        diagnostic.failureSignature ??
-        (screenObservation.reason || launch.message).toUpperCase();
-      const reason = screenObservation.reason || launch.message;
-
-      this.experimentManager.markFailed(
-        request.game,
-        experiment.id,
-        failureSignature,
-        [reason]
-      );
-
-      attempts.push({
-        experiment,
-        launch,
-        verified: false,
-        reason,
-        failureSignature,
-      });
     }
 
-    const latestDiagnostics = this.analyzer
-      ? []
-      : [];
     const plan = this.recoveryPlanner.plan(
-      latestDiagnostics,
+      this.experimentManager.getDiagnostics(request.game),
       this.experimentManager.getLastKnownGood(request.game) !== null
     );
 
@@ -266,15 +272,16 @@ export class MacCompatibilityRecoveryEngine {
       message:
         attempts.length === 0
           ? `No eligible compatibility stack is currently available. ${plan[0]?.reason ?? "Additional evidence is required."}`
-          : `No compatibility stack passed working-state verification after ${attempts.length} experiment(s).`,
+          : `No compatibility stack passed working-state verification after ${attempts.length} experiment(s). Next diagnostic action: ${plan[0]?.title ?? "collect more evidence"}.`,
     };
   }
 
-  private async analyzerToCompatibility(
+  private analyzerToCompatibility(
     request: MacCompatibilityRecoveryRequest,
     analysis: Awaited<ReturnType<MacCompatibilityAnalyzer["analyze"]>>
-  ): Promise<MacGameCompatibility> {
-    const selected = analysis.candidates.find((candidate) => candidate.eligible)?.stack ?? null;
+  ): MacGameCompatibility {
+    const selected =
+      analysis.candidates.find((candidate) => candidate.eligible)?.stack ?? null;
 
     return {
       shop: request.game.shop,
