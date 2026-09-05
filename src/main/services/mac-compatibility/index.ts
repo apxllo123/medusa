@@ -14,6 +14,7 @@ export { MacCompatibilityResourceGuard } from "./MacCompatibilityResourceGuard.j
 export { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
 export { MacCompatibilityStackProvisioner } from "./MacCompatibilityStackProvisioner.js";
 export { MacScreenObserverProcessClient } from "./MacScreenObserverProcessClient.js";
+export { MacCompatibilityProcessLogger } from "./MacCompatibilityProcessLogger.js";
 export { MacGameManager } from "./MacGameManager.js";
 export { MacSystemDetector } from "./MacSystemDetector.js";
 export { MacWineDetector } from "./MacWineDetector.js";
@@ -32,6 +33,7 @@ export {
   MacWineEnvironmentRegistry,
   MacWineEnvironmentRepairer,
 } from "./environment/index.js";
+export { MacIsolatedWineEnvironment } from "./environment/MacIsolatedWineEnvironment.js";
 
 export type {
   MacArchitecture,
