@@ -72,6 +72,21 @@ export interface MacCompatibilityLastKnownGood {
   experimentId: string;
 }
 
+export interface MacCompatibilityDiagnosticEvidence {
+  source: "process" | "runtime" | "screen" | "system";
+  text: string;
+  timestamp: string;
+  confidence: number;
+}
+
+export interface MacCompatibilityDiagnosticRecord {
+  id: string;
+  failureSignature: string | null;
+  evidence: MacCompatibilityDiagnosticEvidence[];
+  summary: string;
+  createdAt: string;
+}
+
 export type MacCompatibilityAction =
   | "test"
   | "repair"
@@ -200,6 +215,7 @@ export interface MacCompatibilityRegistryEntry {
   selectedStack?: MacCompatibilityStack | null;
   lastKnownGood?: MacCompatibilityLastKnownGood | null;
   experiments?: MacCompatibilityExperiment[];
+  diagnostics?: MacCompatibilityDiagnosticRecord[];
   lastStatus: MacCompatibilityStatus;
   lastCheckedAt: string | null;
   updatedAt: string;
