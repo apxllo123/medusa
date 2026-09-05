@@ -1,6 +1,7 @@
 export { MacCompatibilityManager } from "./MacCompatibilityManager.js";
 export { MacCompatibilityRegistry } from "./MacCompatibilityRegistry.js";
 export { MacCompatibilityComponentDetector } from "./MacCompatibilityComponentDetector.js";
+export { MacCompatibilityExperimentManager } from "./MacCompatibilityExperimentManager.js";
 export { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
 export { MacCompatibilityStackProvisioner } from "./MacCompatibilityStackProvisioner.js";
 export { MacGameManager } from "./MacGameManager.js";
@@ -28,8 +29,10 @@ export type {
   MacCompatibilityCheckResult,
   MacCompatibilityComponent,
   MacCompatibilityComponentType,
+  MacCompatibilityExperiment,
   MacCompatibilityGameKey,
   MacCompatibilityIssue,
+  MacCompatibilityLastKnownGood,
   MacCompatibilityLevel,
   MacCompatibilityOperationProgress,
   MacCompatibilityOperationResult,
