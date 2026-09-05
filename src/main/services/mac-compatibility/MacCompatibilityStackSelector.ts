@@ -5,10 +5,12 @@ import type {
   MacSystemInfo,
   MacWineVersion,
 } from "./MacCompatibilityTypes.js";
+import type { MacGameRequirements } from "./MacGameRequirementsCatalog.js";
 
 export interface MacCompatibilityStackCandidate {
   stack: MacCompatibilityStack;
   score: number;
+  eligible: boolean;
   reasons: string[];
 }
 
@@ -17,32 +19,38 @@ export interface MacCompatibilityStackSelectionInput {
   wineVersions: MacWineVersion[];
   components: MacCompatibilityComponent[];
   preferredStackId?: string | null;
+  requirements?: MacGameRequirements | null;
 }
 
 /**
- * Capability-driven stack ranking. This first implementation deliberately
- * prefers verified, locally available components and keeps Wine as the
- * baseline runtime so existing installations remain usable while the
- * graphics/backend implementations are introduced incrementally.
- *
- * It does not claim that the presence of Apple tooling proves a game can
- * run. Actual compatibility is established later by an isolated probe.
+ * Capability-driven stack ranking. Runtime presence is not treated as
+ * sufficient: when a game requires a graphics API, at least one installed
+ * graphics translator must advertise support for that API before the
+ * candidate is eligible for an actual compatibility experiment.
  */
 export class MacCompatibilityStackSelector {
-  select(
-    input: MacCompatibilityStackSelectionInput
-  ): MacCompatibilityStackCandidate[] {
+  select(input: MacCompatibilityStackSelectionInput): MacCompatibilityStackCandidate[] {
     const candidates: MacCompatibilityStackCandidate[] = [];
+    const graphicsComponents = input.components.filter(
+      (component) => component.type === "graphics" && component.isInstalled
+    );
 
     for (const wine of input.wineVersions) {
       if (!this.supportsArchitecture(wine.architecture, input.systemInfo.architecture)) {
         continue;
       }
 
+      const graphicsComponent = this.findGraphicsComponent(
+        graphicsComponents,
+        input.requirements?.graphicsApis ?? []
+      );
+
       const stack: MacCompatibilityStack = {
-        id: `wine:${wine.id}`,
+        id: graphicsComponent
+          ? `wine:${wine.id}+graphics:${graphicsComponent.id}`
+          : `wine:${wine.id}`,
         runtimeComponentId: wine.id,
-        graphicsComponentId: null,
+        graphicsComponentId: graphicsComponent?.id ?? null,
         toolingComponentIds: this.findToolingIds(input.components),
         dependencyComponentIds: [],
         confidence: null,
@@ -50,6 +58,7 @@ export class MacCompatibilityStackSelector {
       };
 
       let score = 50;
+      let eligible = true;
       const reasons: string[] = ["Wine runtime is installed and discoverable."];
 
       if (wine.isRecommended) {
@@ -77,14 +86,29 @@ export class MacCompatibilityStackSelector {
         reasons.push("Apple developer/diagnostic tooling is available.");
       }
 
-      candidates.push({
-        stack,
-        score,
-        reasons,
-      });
+      if (input.requirements?.graphicsApis.length) {
+        if (graphicsComponent) {
+          score += 20;
+          reasons.push(
+            `Installed graphics backend supports ${input.requirements.graphicsApis.join(", ")}.`
+          );
+        } else {
+          eligible = false;
+          score = Math.min(score, 20);
+          reasons.push(
+            `No installed graphics backend currently advertises support for ${input.requirements.graphicsApis.join(", ")}.`
+          );
+        }
+      }
+
+      candidates.push({ stack, score, eligible, reasons });
     }
 
     candidates.sort((a, b) => {
+      if (a.eligible !== b.eligible) {
+        return a.eligible ? -1 : 1;
+      }
+
       if (b.score !== a.score) {
         return b.score - a.score;
       }
@@ -110,9 +134,24 @@ export class MacCompatibilityStackSelector {
     return runtimeArchitecture === systemArchitecture;
   }
 
-  private findToolingIds(
-    components: MacCompatibilityComponent[]
-  ): string[] {
+  private findGraphicsComponent(
+    components: MacCompatibilityComponent[],
+    requiredApis: NonNullable<MacGameRequirements["graphicsApis"]>
+  ): MacCompatibilityComponent | null {
+    if (requiredApis.length === 0) {
+      return null;
+    }
+
+    return (
+      components.find((component) =>
+        requiredApis.every((api) =>
+          component.supportedGraphicsApis?.includes(api)
+        )
+      ) ?? null
+    );
+  }
+
+  private findToolingIds(components: MacCompatibilityComponent[]): string[] {
     return components
       .filter((component) => component.type === "tooling" && component.isInstalled)
       .map((component) => component.id)
