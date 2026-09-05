@@ -83,6 +83,11 @@ export interface MacSystemInfo {
   wineAvailable: boolean;
   protonAvailable: boolean;
   rosettaAvailable: boolean;
+  /**
+   * Positively discovered developer/compatibility components. Optional
+   * so legacy system-info consumers remain source compatible.
+   */
+  compatibilityComponents?: MacCompatibilityComponent[];
 }
 
 export interface MacWineVersion {
