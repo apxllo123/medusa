@@ -89,7 +89,6 @@ export class MacGameLaunchManager {
     let environment = await this.compatibilityManager.getGameEnvironment(
       request.game
     );
-
     let wineVersions = await this.compatibilityManager.getWineVersions();
 
     const selectedRuntimeId =
@@ -218,6 +217,38 @@ export class MacGameLaunchManager {
       prepared.environment,
       prepared.wineVersion,
       prepared.compatibilityStack
+    );
+  }
+
+  /**
+   * Launches a previously prepared experiment environment without touching
+   * the game's normal persisted environment. Used by the autonomous repair
+   * loop after an isolated stack has been provisioned and verified.
+   */
+  async launchInCompatibilityEnvironment(
+    request: MacGameLaunchRequest,
+    compatibility: MacGameCompatibility,
+    environment: MacWineEnvironment,
+    wineVersion: MacWineVersion,
+    stack: MacCompatibilityStack
+  ): Promise<MacGameLaunchResult> {
+    const prepared: MacGameLaunchResult = {
+      success: true,
+      pid: null,
+      compatibility,
+      compatibilityStack: stack,
+      environment,
+      wineVersion,
+      logPaths: null,
+      message: "Isolated compatibility environment is ready for launch.",
+    };
+
+    return this.launchWithWine(
+      request,
+      prepared,
+      environment,
+      wineVersion,
+      stack
     );
   }
 
