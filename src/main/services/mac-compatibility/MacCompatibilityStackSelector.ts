@@ -2,6 +2,7 @@ import type {
   MacArchitecture,
   MacCompatibilityComponent,
   MacCompatibilityStack,
+  MacCompatibilityRuntimeFamily,
   MacSystemInfo,
   MacWineVersion,
 } from "./MacCompatibilityTypes.js";
@@ -23,10 +24,9 @@ export interface MacCompatibilityStackSelectionInput {
 }
 
 /**
- * Capability-driven stack ranking. Runtime presence is not treated as
- * sufficient: when a game requires a graphics API, at least one installed
- * graphics translator must advertise support for that API before the
- * candidate is eligible for an actual compatibility experiment.
+ * Capability-driven stack ranking. Runtime presence is not sufficient: a
+ * graphics backend must also advertise the required API and be compatible
+ * with the selected runtime family when that coupling is known.
  */
 export class MacCompatibilityStackSelector {
   select(input: MacCompatibilityStackSelectionInput): MacCompatibilityStackCandidate[] {
@@ -36,13 +36,12 @@ export class MacCompatibilityStackSelector {
     );
 
     for (const wine of input.wineVersions) {
-      if (!this.supportsArchitecture(wine.architecture, input.systemInfo.architecture)) {
-        continue;
-      }
+      if (!this.supportsArchitecture(wine, input.systemInfo)) continue;
 
       const graphicsComponent = this.findGraphicsComponent(
         graphicsComponents,
-        input.requirements?.graphicsApis ?? []
+        input.requirements?.graphicsApis ?? [],
+        wine.runtimeFamily ?? "wine"
       );
 
       const stack: MacCompatibilityStack = {
@@ -50,6 +49,7 @@ export class MacCompatibilityStackSelector {
           ? `wine:${wine.id}+graphics:${graphicsComponent.id}`
           : `wine:${wine.id}`,
         runtimeComponentId: wine.id,
+        runtimeFamily: wine.runtimeFamily ?? "wine",
         graphicsComponentId: graphicsComponent?.id ?? null,
         toolingComponentIds: this.findToolingIds(input.components),
         dependencyComponentIds: [],
@@ -63,7 +63,7 @@ export class MacCompatibilityStackSelector {
 
       if (wine.isRecommended) {
         score += 15;
-        reasons.push("Wine installation is marked as recommended.");
+        reasons.push("Runtime installation is marked as recommended.");
       }
 
       if (input.systemInfo.isAppleSilicon && wine.architecture === "arm64") {
@@ -71,9 +71,17 @@ export class MacCompatibilityStackSelector {
         reasons.push("Runtime architecture matches Apple Silicon.");
       }
 
-      if (input.systemInfo.rosettaAvailable && wine.architecture === "x64") {
-        score += 3;
-        reasons.push("Rosetta is available for Intel runtime support.");
+      if (
+        input.systemInfo.isAppleSilicon &&
+        wine.architecture === "x64" &&
+        input.systemInfo.rosettaAvailable
+      ) {
+        score += 6;
+        reasons.push("Rosetta is available for the x86_64 runtime.");
+      } else if (wine.architecture === "x64" && input.systemInfo.isAppleSilicon) {
+        eligible = false;
+        score = Math.min(score, 20);
+        reasons.push("x86_64 runtime requires Rosetta on Apple Silicon, but Rosetta was not detected.");
       }
 
       if (input.preferredStackId === stack.id) {
@@ -90,13 +98,13 @@ export class MacCompatibilityStackSelector {
         if (graphicsComponent) {
           score += 20;
           reasons.push(
-            `Installed graphics backend supports ${input.requirements.graphicsApis.join(", ")}.`
+            `Installed graphics backend supports ${input.requirements.graphicsApis.join(", ")} for the ${wine.runtimeFamily ?? "wine"} runtime family.`
           );
         } else {
           eligible = false;
           score = Math.min(score, 20);
           reasons.push(
-            `No installed graphics backend currently advertises support for ${input.requirements.graphicsApis.join(", ")}.`
+            `No installed graphics backend currently advertises support for ${input.requirements.graphicsApis.join(", ")} with the ${wine.runtimeFamily ?? "wine"} runtime family.`
           );
         }
       }
@@ -105,14 +113,8 @@ export class MacCompatibilityStackSelector {
     }
 
     candidates.sort((a, b) => {
-      if (a.eligible !== b.eligible) {
-        return a.eligible ? -1 : 1;
-      }
-
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-
+      if (a.eligible !== b.eligible) return a.eligible ? -1 : 1;
+      if (b.score !== a.score) return b.score - a.score;
       return a.stack.id.localeCompare(b.stack.id);
     });
 
@@ -120,34 +122,47 @@ export class MacCompatibilityStackSelector {
   }
 
   private supportsArchitecture(
-    runtimeArchitecture: MacArchitecture | "universal",
-    systemArchitecture: MacArchitecture
+    runtime: MacWineVersion,
+    systemInfo: MacSystemInfo
   ): boolean {
-    if (runtimeArchitecture === "universal") {
+    const systemArchitecture = systemInfo.architecture;
+
+    if (runtime.architecture === "universal") {
       return systemArchitecture !== "unknown";
     }
 
-    if (systemArchitecture === "unknown") {
-      return false;
-    }
+    if (systemArchitecture === "unknown") return false;
 
-    return runtimeArchitecture === systemArchitecture;
+    if (runtime.architecture === systemArchitecture) return true;
+
+    return (
+      systemInfo.isAppleSilicon &&
+      runtime.architecture === "x64" &&
+      runtime.runtimeFamily === "apple-gptk" &&
+      systemInfo.rosettaAvailable
+    );
   }
 
   private findGraphicsComponent(
     components: MacCompatibilityComponent[],
-    requiredApis: NonNullable<MacGameRequirements["graphicsApis"]>
+    requiredApis: NonNullable<MacGameRequirements["graphicsApis"]>,
+    runtimeFamily: MacCompatibilityRuntimeFamily
   ): MacCompatibilityComponent | null {
-    if (requiredApis.length === 0) {
-      return null;
-    }
+    if (requiredApis.length === 0) return null;
 
     return (
-      components.find((component) =>
-        requiredApis.every((api) =>
+      components.find((component) => {
+        if (
+          component.runtimeFamily !== undefined &&
+          component.runtimeFamily !== runtimeFamily
+        ) {
+          return false;
+        }
+
+        return requiredApis.every((api) =>
           component.supportedGraphicsApis?.includes(api)
-        )
-      ) ?? null
+        );
+      }) ?? null
     );
   }
 
