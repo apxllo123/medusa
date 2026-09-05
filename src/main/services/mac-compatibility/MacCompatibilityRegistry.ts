@@ -4,36 +4,18 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
+  MacCompatibilityExperiment,
   MacCompatibilityGameKey,
+  MacCompatibilityLastKnownGood,
   MacCompatibilityRegistryEntry,
   MacCompatibilityStack,
   MacCompatibilityStatus,
   MacWineEnvironment,
 } from "./MacCompatibilityTypes.js";
 
-/**
- * Disk-backed, matching the pattern MacWineEnvironmentRegistry already
- * uses one level down. Before this change, every entry here (selected
- * Wine version, last known status, environment reference) was lost on
- * every Hydra restart, forcing a full re-check of every game.
- *
- * Public API is intentionally kept SYNCHRONOUS — every existing call
- * site in MacCompatibilityManager.ts calls these methods without
- * `await`. Making this class async instead would require updating every
- * one of those call sites, which is a second file and a larger change
- * than this fix needs. Instead: load once, synchronously, at
- * construction (a single small JSON read at startup is cheap), and
- * persist writes in the background without blocking the caller.
- *
- * Background writes are queued and atomic (see persist()), so they
- * cannot land out of order or leave a half-written file, and flush()
- * exists for callers that want to wait for the disk before quitting.
- */
 export class MacCompatibilityRegistry {
   private readonly entries = new Map<string, MacCompatibilityRegistryEntry>();
   private readonly registryPath: string;
-
-  /** Serializes background writes so disk order matches call order. */
   private persistQueue: Promise<void> = Promise.resolve();
 
   constructor(
@@ -56,16 +38,11 @@ export class MacCompatibilityRegistry {
 
   private loadFromDisk(): void {
     try {
-      if (!existsSync(this.registryPath)) {
-        return;
-      }
+      if (!existsSync(this.registryPath)) return;
 
       const contents = readFileSync(this.registryPath, "utf8");
       const data = JSON.parse(contents) as MacCompatibilityRegistryEntry[];
-
-      if (!Array.isArray(data)) {
-        return;
-      }
+      if (!Array.isArray(data)) return;
 
       for (const entry of data) {
         if (entry?.key?.shop && entry?.key?.objectId) {
@@ -73,7 +50,7 @@ export class MacCompatibilityRegistry {
         }
       }
     } catch {
-      // No registry yet, or it's corrupted — start empty rather than crash.
+      // Corrupt or absent state starts empty and is recreated on write.
     }
   }
 
@@ -95,7 +72,6 @@ export class MacCompatibilityRegistry {
 
   private async writeAtomically(contents: string): Promise<void> {
     await mkdir(dirname(this.registryPath), { recursive: true });
-
     const temporaryPath = `${this.registryPath}.${randomUUID()}.tmp`;
 
     try {
@@ -111,9 +87,7 @@ export class MacCompatibilityRegistry {
     await this.persistQueue;
   }
 
-  public get(
-    key: MacCompatibilityGameKey
-  ): MacCompatibilityRegistryEntry | null {
+  public get(key: MacCompatibilityGameKey): MacCompatibilityRegistryEntry | null {
     return this.entries.get(this.getKey(key)) ?? null;
   }
 
@@ -127,9 +101,7 @@ export class MacCompatibilityRegistry {
 
   public delete(key: MacCompatibilityGameKey): boolean {
     const deleted = this.entries.delete(this.getKey(key));
-    if (deleted) {
-      this.persist();
-    }
+    if (deleted) this.persist();
     return deleted;
   }
 
@@ -137,9 +109,7 @@ export class MacCompatibilityRegistry {
     return this.entries.has(this.getKey(key));
   }
 
-  public getEnvironment(
-    key: MacCompatibilityGameKey
-  ): MacWineEnvironment | null {
+  public getEnvironment(key: MacCompatibilityGameKey): MacWineEnvironment | null {
     return this.get(key)?.environment ?? null;
   }
 
@@ -155,7 +125,6 @@ export class MacCompatibilityRegistry {
         environment,
         updatedAt: new Date().toISOString(),
       });
-
       return;
     }
 
@@ -163,6 +132,9 @@ export class MacCompatibilityRegistry {
       key,
       environment,
       selectedWineVersionId: environment?.wineVersionId ?? null,
+      selectedStack: null,
+      lastKnownGood: null,
+      experiments: [],
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
@@ -182,7 +154,6 @@ export class MacCompatibilityRegistry {
         lastCheckedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-
       return;
     }
 
@@ -190,6 +161,9 @@ export class MacCompatibilityRegistry {
       key,
       environment: null,
       selectedWineVersionId: null,
+      selectedStack: null,
+      lastKnownGood: null,
+      experiments: [],
       lastStatus: status,
       lastCheckedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -208,7 +182,6 @@ export class MacCompatibilityRegistry {
         selectedWineVersionId: wineVersionId,
         updatedAt: new Date().toISOString(),
       });
-
       return;
     }
 
@@ -216,15 +189,16 @@ export class MacCompatibilityRegistry {
       key,
       environment: null,
       selectedWineVersionId: wineVersionId,
+      selectedStack: null,
+      lastKnownGood: null,
+      experiments: [],
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
     });
   }
 
-  public getSelectedStackId(
-    key: MacCompatibilityGameKey
-  ): string | null {
+  public getSelectedStackId(key: MacCompatibilityGameKey): string | null {
     return this.get(key)?.selectedStack?.id ?? null;
   }
 
@@ -240,7 +214,6 @@ export class MacCompatibilityRegistry {
         selectedStack: stack,
         updatedAt: new Date().toISOString(),
       });
-
       return;
     }
 
@@ -249,10 +222,98 @@ export class MacCompatibilityRegistry {
       environment: null,
       selectedWineVersionId: stack?.runtimeComponentId ?? null,
       selectedStack: stack,
+      lastKnownGood: null,
+      experiments: [],
       lastStatus: "unknown",
       lastCheckedAt: null,
       updatedAt: new Date().toISOString(),
     });
+  }
+
+  public getExperiments(key: MacCompatibilityGameKey): MacCompatibilityExperiment[] {
+    return [...(this.get(key)?.experiments ?? [])];
+  }
+
+  public addExperiment(
+    key: MacCompatibilityGameKey,
+    experiment: MacCompatibilityExperiment
+  ): void {
+    const existing = this.get(key);
+
+    if (existing) {
+      this.set(key, {
+        ...existing,
+        experiments: [...(existing.experiments ?? []), experiment],
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    this.set(key, {
+      key,
+      environment: null,
+      selectedWineVersionId: experiment.stack.runtimeComponentId,
+      selectedStack: null,
+      lastKnownGood: null,
+      experiments: [experiment],
+      lastStatus: "unknown",
+      lastCheckedAt: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public updateExperiment(
+    key: MacCompatibilityGameKey,
+    experimentId: string,
+    update: Partial<MacCompatibilityExperiment>
+  ): void {
+    const existing = this.get(key);
+    if (!existing) return;
+
+    const experiments = (existing.experiments ?? []).map((experiment) =>
+      experiment.id === experimentId ? { ...experiment, ...update } : experiment
+    );
+
+    this.set(key, {
+      ...existing,
+      experiments,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public setLastKnownGood(
+    key: MacCompatibilityGameKey,
+    lastKnownGood: MacCompatibilityLastKnownGood
+  ): void {
+    const existing = this.get(key);
+    if (!existing) {
+      this.set(key, {
+        key,
+        environment: null,
+        selectedWineVersionId: lastKnownGood.stack.runtimeComponentId,
+        selectedStack: lastKnownGood.stack,
+        lastKnownGood,
+        experiments: [],
+        lastStatus: "ready",
+        lastCheckedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    this.set(key, {
+      ...existing,
+      selectedStack: lastKnownGood.stack,
+      selectedWineVersionId: lastKnownGood.stack.runtimeComponentId,
+      lastKnownGood,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  public getLastKnownGood(
+    key: MacCompatibilityGameKey
+  ): MacCompatibilityLastKnownGood | null {
+    return this.get(key)?.lastKnownGood ?? null;
   }
 
   public getAll(): MacCompatibilityRegistryEntry[] {
