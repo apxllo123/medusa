@@ -118,7 +118,6 @@ export class MacGameLaunchManager {
           request.game,
           compatibility.compatibilityStack
         );
-
         wineVersions = await this.compatibilityManager.getWineVersions();
         wineVersion = this.findWineVersion(
           environment.wineVersionId,
@@ -157,7 +156,6 @@ export class MacGameLaunchManager {
     const healthy = await this.compatibilityManager.testGameEnvironment(
       request.game
     );
-
     environment =
       (await this.compatibilityManager.getGameEnvironment(request.game)) ??
       environment;
@@ -220,11 +218,6 @@ export class MacGameLaunchManager {
     );
   }
 
-  /**
-   * Launches a previously prepared experiment environment without touching
-   * the game's normal persisted environment. Used by the autonomous repair
-   * loop after an isolated stack has been provisioned and verified.
-   */
   async launchInCompatibilityEnvironment(
     request: MacGameLaunchRequest,
     compatibility: MacGameCompatibility,
@@ -323,31 +316,41 @@ export class MacGameLaunchManager {
         WINEPREFIX: environment.prefixPath,
       };
 
-      if (stack?.runtimeFamily === "apple-gptk" && stack.graphicsComponentId) {
-        const systemInfo = await this.compatibilityManager.getSystemInfo();
-        const graphicsComponent =
-          systemInfo.compatibilityComponents?.find(
-            (component) => component.id === stack.graphicsComponentId
-          ) ?? null;
+      let executable = wineVersion.executablePath;
+      let launchArgs = [request.executablePath, ...(request.args ?? [])];
 
-        if (graphicsComponent?.executablePath) {
-          env.D3DMETAL_FRAMEWORK_PATH = graphicsComponent.executablePath;
+      if (stack?.runtimeFamily === "apple-gptk") {
+        if (wineVersion.launcherPath) {
+          executable = wineVersion.launcherPath;
+          launchArgs = [
+            environment.prefixPath,
+            request.executablePath,
+            ...(request.args ?? []),
+          ];
+        }
+
+        if (stack.graphicsComponentId) {
+          const systemInfo = await this.compatibilityManager.getSystemInfo();
+          const graphicsComponent =
+            systemInfo.compatibilityComponents?.find(
+              (component) => component.id === stack.graphicsComponentId
+            ) ?? null;
+
+          if (graphicsComponent?.executablePath) {
+            env.D3DMETAL_FRAMEWORK_PATH = graphicsComponent.executablePath;
+          }
         }
       }
 
       logs = this.processLogger.open(request.game, randomUUID());
 
-      const child = spawn(
-        wineVersion.executablePath,
-        [request.executablePath, ...(request.args ?? [])],
-        {
-          shell: false,
-          detached: true,
-          stdio: ["ignore", logs.stdoutFd, logs.stderrFd],
-          cwd: workingDirectory,
-          env,
-        }
-      );
+      const child = spawn(executable, launchArgs, {
+        shell: false,
+        detached: true,
+        stdio: ["ignore", logs.stdoutFd, logs.stderrFd],
+        cwd: workingDirectory,
+        env,
+      });
 
       return await new Promise<MacGameLaunchResult>((resolve) => {
         const onSpawn = () => {
