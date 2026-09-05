@@ -11,6 +11,7 @@ export interface MacScreenObservationResult {
   captured: boolean;
   source: "window" | "display" | "none";
   windowId: number | null;
+  windowTitle: string | null;
   imagePath: string | null;
   observations: MacScreenTextObservation[];
   combinedText: string;
