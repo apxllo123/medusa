@@ -12,11 +12,6 @@ export interface MacCompatibilityExperimentManagerDependencies {
   experimentsRoot?: string;
 }
 
-/**
- * Creates bounded, persistent experiment records without mutating the
- * game's known-good profile. Actual runtime provisioning can attach an
- * isolated prefixPath to the record in a later phase.
- */
 export class MacCompatibilityExperimentManager {
   private readonly registry: MacCompatibilityRegistry;
   private readonly experimentsRoot: string;
@@ -35,10 +30,7 @@ export class MacCompatibilityExperimentManager {
       );
   }
 
-  start(
-    game: MacCompatibilityGameKey,
-    stack: MacCompatibilityStack
-  ): MacCompatibilityExperiment {
+  start(game: MacCompatibilityGameKey, stack: MacCompatibilityStack): MacCompatibilityExperiment {
     const id = randomUUID();
     const experiment: MacCompatibilityExperiment = {
       id,
@@ -56,13 +48,8 @@ export class MacCompatibilityExperimentManager {
     return experiment;
   }
 
-  markRunning(
-    game: MacCompatibilityGameKey,
-    experimentId: string
-  ): void {
-    this.registry.updateExperiment(game, experimentId, {
-      status: "running",
-    });
+  markRunning(game: MacCompatibilityGameKey, experimentId: string): void {
+    this.registry.updateExperiment(game, experimentId, { status: "running" });
   }
 
   markPassed(
@@ -96,6 +83,53 @@ export class MacCompatibilityExperimentManager {
       status: "cancelled",
       finishedAt: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Promotion is deliberately separate from passing. A caller must have
+   * already verified the real game working state before this method is used.
+   */
+  promoteVerified(
+    game: MacCompatibilityGameKey,
+    experimentId: string,
+    verificationNotes: string[] = []
+  ): MacCompatibilityExperiment {
+    const experiment = this.registry
+      .getExperiments(game)
+      .find((candidate) => candidate.id === experimentId);
+
+    if (!experiment) {
+      throw new Error(`Compatibility experiment ${experimentId} was not found.`);
+    }
+
+    if (experiment.status !== "passed") {
+      throw new Error(
+        `Compatibility experiment ${experimentId} must be passed before promotion.`
+      );
+    }
+
+    const stack = {
+      ...experiment.stack,
+      confidence: 1,
+      verified: true,
+    };
+
+    this.registry.setLastKnownGood(game, {
+      stack,
+      verifiedAt: new Date().toISOString(),
+      experimentId,
+    });
+
+    this.registry.updateExperiment(game, experimentId, {
+      stack,
+      notes: [...experiment.notes, ...verificationNotes],
+    });
+
+    return {
+      ...experiment,
+      stack,
+      notes: [...experiment.notes, ...verificationNotes],
+    };
   }
 
   getExperiments(game: MacCompatibilityGameKey): MacCompatibilityExperiment[] {
