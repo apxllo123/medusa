@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MacCompatibilityComponentDetector } from "./MacCompatibilityComponentDetector.ts";
 
+const EXECUTABLE_FIXTURE = "/bin/echo";
+
 const makeRunner = (responses: Record<string, string>) => {
   const calls: Array<{ file: string; args: string[] }> = [];
 
@@ -34,20 +36,15 @@ describe("MacCompatibilityComponentDetector", () => {
 
   it("discovers positively located Apple Metal tooling", async () => {
     const { run } = makeRunner({
-      "xcrun --find metal": "/Applications/Xcode.app/Contents/Developer/usr/bin/metal",
-      "/Applications/Xcode.app/Contents/Developer/usr/bin/metal --version": "Apple metal version",
-      "xcrun --find gpucapture": "/usr/bin/gpucapture",
-      "/usr/bin/gpucapture --help": "usage",
-      "xcrun --find gpudebug": "/usr/bin/gpudebug",
-      "/usr/bin/gpudebug --help": "usage",
-      "which gameportingtoolkit": "/opt/homebrew/bin/gameportingtoolkit",
-      "/opt/homebrew/bin/gameportingtoolkit --help": "usage",
+      "xcrun --find metal": EXECUTABLE_FIXTURE,
+      [`${EXECUTABLE_FIXTURE} --version`]: "Apple metal version",
+      "xcrun --find gpucapture": EXECUTABLE_FIXTURE,
+      [`${EXECUTABLE_FIXTURE} --help`]: "usage",
+      "xcrun --find gpudebug": EXECUTABLE_FIXTURE,
+      "which gameportingtoolkit": EXECUTABLE_FIXTURE,
       "which game-porting-toolkit": "",
     });
 
-    // The fake runner does not perform fs access checks, so this test is
-    // about command resolution and component shaping rather than the host
-    // filesystem. The real implementation adds the executable-bit check.
     const detector = new MacCompatibilityComponentDetector(run);
     const components = await detector.discoverInstalledComponents("arm64");
 
@@ -65,15 +62,14 @@ describe("MacCompatibilityComponentDetector", () => {
     assert.equal(
       components.find((component) => component.id === "apple-gptk")
         ?.executablePath,
-      "/opt/homebrew/bin/gameportingtoolkit"
+      EXECUTABLE_FIXTURE
     );
   });
 
   it("does not invent a component when the resolver fails", async () => {
     const { run } = makeRunner({
-      "xcrun --find metal": "/Applications/Xcode.app/Contents/Developer/usr/bin/metal",
-      "/Applications/Xcode.app/Contents/Developer/usr/bin/metal --version": "Apple metal version",
-      // Other resolvers are intentionally absent and therefore fail.
+      "xcrun --find metal": EXECUTABLE_FIXTURE,
+      [`${EXECUTABLE_FIXTURE} --version`]: "Apple metal version",
     });
 
     const detector = new MacCompatibilityComponentDetector(run);
