@@ -1,6 +1,8 @@
 import type { GameShop } from "@types";
+
 export type MacCompatibilityPlatform = "macos";
 export type MacArchitecture = "arm64" | "x64" | "unknown";
+
 export type MacCompatibilityStatus =
   | "unknown"
   | "checking"
@@ -9,6 +11,7 @@ export type MacCompatibilityStatus =
   | "needs_repair"
   | "unsupported"
   | "error";
+
 export type MacCompatibilityLevel =
   | "native"
   | "excellent"
@@ -17,6 +20,7 @@ export type MacCompatibilityLevel =
   | "poor"
   | "unsupported"
   | "unknown";
+
 export type MacWineType =
   | "wine"
   | "wine-staging"
@@ -24,12 +28,49 @@ export type MacWineType =
   | "proton"
   | "proton-ge"
   | "unknown";
+
+/**
+ * Generic compatibility component categories. Wine remains a runtime
+ * component, while graphics translation, optional tooling, and supporting
+ * dependencies can be represented independently.
+ */
+export type MacCompatibilityComponentType =
+  | "runtime"
+  | "graphics"
+  | "tooling"
+  | "dependency";
+
+export interface MacCompatibilityComponent {
+  id: string;
+  name: string;
+  type: MacCompatibilityComponentType;
+  version: string | null;
+  executablePath: string | null;
+  isInstalled: boolean;
+  architectures: MacArchitecture[];
+}
+
+/**
+ * A complete compatibility stack is assembled from independently
+ * selectable components instead of treating Wine as the whole stack.
+ */
+export interface MacCompatibilityStack {
+  id: string;
+  runtimeComponentId: string | null;
+  graphicsComponentId: string | null;
+  toolingComponentIds: string[];
+  dependencyComponentIds: string[];
+  confidence: number | null;
+  verified: boolean;
+}
+
 export type MacCompatibilityAction =
   | "test"
   | "repair"
   | "create-environment"
   | "change-wine"
   | "install-component";
+
 export interface MacSystemInfo {
   platform: MacCompatibilityPlatform;
   architecture: MacArchitecture;
@@ -43,6 +84,7 @@ export interface MacSystemInfo {
   protonAvailable: boolean;
   rosettaAvailable: boolean;
 }
+
 export interface MacWineVersion {
   id: string;
   name: string;
@@ -53,6 +95,7 @@ export interface MacWineVersion {
   isRecommended: boolean;
   architecture: MacArchitecture | "universal";
 }
+
 export interface MacWineEnvironment {
   id: string;
   prefixPath: string;
@@ -66,6 +109,7 @@ export interface MacWineEnvironment {
   createdAt: string | null;
   updatedAt: string | null;
 }
+
 export interface MacGameCompatibility {
   shop: GameShop;
   objectId: string;
@@ -79,9 +123,15 @@ export interface MacGameCompatibility {
   recommendedWineVersionId: string | null;
   recommendedWineVersionName: string | null;
   environment: MacWineEnvironment | null;
+  /**
+   * Generic stack selected by future backend selection logic. Optional for
+   * backwards compatibility while existing Wine-only consumers migrate.
+   */
+  compatibilityStack?: MacCompatibilityStack | null;
   issues: MacCompatibilityIssue[];
   recommendations: MacCompatibilityRecommendation[];
 }
+
 export interface MacCompatibilityIssue {
   id: string;
   code: string;
@@ -91,6 +141,7 @@ export interface MacCompatibilityIssue {
   fixable: boolean;
   action: MacCompatibilityAction | null;
 }
+
 export interface MacCompatibilityRecommendation {
   id: string;
   title: string;
@@ -98,12 +149,14 @@ export interface MacCompatibilityRecommendation {
   action: MacCompatibilityAction | null;
   priority: "low" | "medium" | "high";
 }
+
 export interface MacCompatibilityCheckResult {
   status: MacCompatibilityStatus;
   issues: MacCompatibilityIssue[];
   recommendations: MacCompatibilityRecommendation[];
   checkedAt: string;
 }
+
 export interface MacCompatibilityOperationProgress {
   operationId: string;
   action: MacCompatibilityAction;
@@ -120,6 +173,7 @@ export interface MacCompatibilityOperationProgress {
   message: string;
   detail: string | null;
 }
+
 export interface MacCompatibilityOperationResult {
   operationId: string;
   success: boolean;
@@ -128,14 +182,21 @@ export interface MacCompatibilityOperationResult {
   environment: MacWineEnvironment | null;
   issues: MacCompatibilityIssue[];
 }
+
 export interface MacCompatibilityGameKey {
   shop: GameShop;
   objectId: string;
 }
+
 export interface MacCompatibilityRegistryEntry {
   key: MacCompatibilityGameKey;
   environment: MacWineEnvironment | null;
   selectedWineVersionId: string | null;
+  /**
+   * Generic stack selection is optional until the compatibility manager
+   * begins persisting the new stack model.
+   */
+  selectedStack?: MacCompatibilityStack | null;
   lastStatus: MacCompatibilityStatus;
   lastCheckedAt: string | null;
   updatedAt: string;
