@@ -1,6 +1,8 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { access, constants, realpath, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type {
   MacArchitecture,
   MacCompatibilityRuntimeFamily,
@@ -22,21 +24,53 @@ export interface WineCandidate {
   runtimeFamily: MacCompatibilityRuntimeFamily;
 }
 
+const GPTK_WINE_LOCATIONS = [
+  {
+    id: "apple-gptk-wine-arm64",
+    path: "/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/wine64",
+  },
+  {
+    id: "apple-gptk-wine-home-applications",
+    path: join(
+      homedir(),
+      "Applications",
+      "Game Porting Toolkit.app",
+      "Contents",
+      "Resources",
+      "wine",
+      "bin",
+      "wine64"
+    ),
+  },
+  {
+    id: "apple-gptk-wine-downloads",
+    path: join(
+      homedir(),
+      "Downloads",
+      "Game Porting Toolkit.app",
+      "Contents",
+      "Resources",
+      "wine",
+      "bin",
+      "wine64"
+    ),
+  },
+];
+
 /**
  * Only real Wine-compatible executables belong here. GPTK gets its own
  * runtime family because Apple's D3DMetal payload is coupled to the Wine
  * environment shipped with the toolkit.
  */
 export const WINE_CANDIDATES: WineCandidate[] = [
-  {
-    id: "apple-gptk-wine-arm64",
+  ...GPTK_WINE_LOCATIONS.map(({ id, path }) => ({
+    id,
     name: "Game Porting Toolkit Wine",
-    type: "wine",
-    executablePath:
-      "/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/wine64",
-    architecture: "x64",
-    runtimeFamily: "apple-gptk",
-  },
+    type: "wine" as const,
+    executablePath: path,
+    architecture: "x64" as const,
+    runtimeFamily: "apple-gptk" as const,
+  })),
   {
     id: "homebrew-wine-arm64",
     name: "Wine (Homebrew, Apple Silicon)",
@@ -176,7 +210,7 @@ export class MacWineDetector {
 
   private isRecommended(id: string): boolean {
     return (
-      id === "apple-gptk-wine-arm64" ||
+      id.startsWith("apple-gptk-wine") ||
       id === "homebrew-wine-arm64" ||
       id === "homebrew-wine-intel"
     );
