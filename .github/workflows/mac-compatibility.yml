@@ -57,6 +57,15 @@ jobs:
       - name: Audit packaged Mac resources
         run: node scripts/mac-resource-audit.cjs
 
+      - name: Smoke test packaged Mac executable
+        run: |
+          set -euo pipefail
+          APP_DIR="dist/mac-arm64/Medusa.app/Contents/MacOS"
+          APP_BINARY="$(find "$APP_DIR" -maxdepth 1 -type f -perm -111 -print -quit)"
+          test -n "$APP_BINARY"
+          file "$APP_BINARY"
+          "$APP_BINARY" --version
+
       - name: Inspect Mac environment
         run: |
           set -euo pipefail
