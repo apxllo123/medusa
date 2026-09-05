@@ -56,10 +56,6 @@ export class MacGameLaunchManager {
       };
     }
 
-    // A game that has a declared graphics requirement cannot fall through to
-    // ordinary Wine when no eligible stack exists. This is especially
-    // important for DX12 titles: a Wine prefix alone does not prove that a
-    // usable graphics translation backend is present.
     if (
       compatibility.issues.some(
         (issue) => issue.code === "GRAPHICS_BACKEND_MISSING"
@@ -106,11 +102,15 @@ export class MacGameLaunchManager {
     if (!environment) {
       try {
         environment = await this.compatibilityManager.createGameEnvironment(
-          request.game
+          request.game,
+          compatibility.compatibilityStack
         );
 
         wineVersions = await this.compatibilityManager.getWineVersions();
-        wineVersion = this.findWineVersion(environment.wineVersionId, wineVersions);
+        wineVersion = this.findWineVersion(
+          environment.wineVersionId,
+          wineVersions
+        );
       } catch (error) {
         return {
           success: false,
