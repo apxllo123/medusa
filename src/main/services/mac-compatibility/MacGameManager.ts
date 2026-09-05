@@ -1,15 +1,32 @@
 import type {
   MacCompatibilityGameKey,
   MacGameCompatibility,
-  MacWineEnvironment,
 } from "./MacCompatibilityTypes.js";
 import { MacCompatibilityManager } from "./MacCompatibilityManager.js";
+import {
+  MacCompatibilityRecoveryEngine,
+  type MacCompatibilityRecoveryRequest,
+  type MacCompatibilityRecoveryResult,
+} from "./MacCompatibilityRecoveryEngine.js";
+import { MacScreenObserverProcessClient } from "./MacScreenObserverProcessClient.js";
+
 export class MacGameManager {
   private readonly compatibilityManager: MacCompatibilityManager;
-  constructor(compatibilityManager?: MacCompatibilityManager) {
+  private readonly recoveryEngine: MacCompatibilityRecoveryEngine;
+
+  constructor(
+    compatibilityManager?: MacCompatibilityManager,
+    recoveryEngine?: MacCompatibilityRecoveryEngine
+  ) {
     this.compatibilityManager =
       compatibilityManager ?? new MacCompatibilityManager();
+    this.recoveryEngine =
+      recoveryEngine ??
+      new MacCompatibilityRecoveryEngine({
+        screenObserver: new MacScreenObserverProcessClient(),
+      });
   }
+
   async checkGame(
     game: MacCompatibilityGameKey,
     title: string,
@@ -17,22 +34,29 @@ export class MacGameManager {
   ): Promise<MacGameCompatibility> {
     return this.compatibilityManager.checkGame(game, title, isWindowsGame);
   }
+
   async getEnvironment(
     game: MacCompatibilityGameKey
-  ): Promise<MacWineEnvironment | null> {
+  ) {
     return this.compatibilityManager.getGameEnvironment(game);
   }
+
+  async fixGame(
+    request: MacCompatibilityRecoveryRequest
+  ): Promise<MacCompatibilityRecoveryResult> {
+    return this.recoveryEngine.fixGame(request);
+  }
+
   async isReadyToLaunch(
     game: MacCompatibilityGameKey,
     title: string,
     isWindowsGame: boolean
   ): Promise<boolean> {
-    if (!isWindowsGame) {
-      return true;
-    }
+    if (!isWindowsGame) return true;
     const compatibility = await this.checkGame(game, title, isWindowsGame);
     return compatibility.status === "ready";
   }
+
   async getLaunchStatus(
     game: MacCompatibilityGameKey,
     title: string,
