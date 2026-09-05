@@ -6,15 +6,24 @@ import type {
   MacCompatibilityStack,
 } from "./MacCompatibilityTypes.js";
 import { MacCompatibilityRegistry } from "./MacCompatibilityRegistry.js";
+import {
+  DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET,
+  MacCompatibilityResourceGuard,
+  type MacCompatibilityResourceBudget,
+} from "./MacCompatibilityResourceGuard.js";
 
 export interface MacCompatibilityExperimentManagerDependencies {
   registry?: MacCompatibilityRegistry;
   experimentsRoot?: string;
+  resourceGuard?: MacCompatibilityResourceGuard;
+  resourceBudget?: MacCompatibilityResourceBudget;
 }
 
 export class MacCompatibilityExperimentManager {
   private readonly registry: MacCompatibilityRegistry;
   private readonly experimentsRoot: string;
+  private readonly resourceGuard: MacCompatibilityResourceGuard;
+  private readonly releases = new Map<string, () => void>();
 
   constructor(dependencies?: MacCompatibilityExperimentManagerDependencies) {
     this.registry = dependencies?.registry ?? new MacCompatibilityRegistry();
@@ -28,9 +37,19 @@ export class MacCompatibilityExperimentManager {
         "mac-compatibility",
         "experiments"
       );
+    this.resourceGuard =
+      dependencies?.resourceGuard ??
+      new MacCompatibilityResourceGuard(
+        dependencies?.resourceBudget ?? DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET
+      );
   }
 
-  start(game: MacCompatibilityGameKey, stack: MacCompatibilityStack): MacCompatibilityExperiment {
+  start(
+    game: MacCompatibilityGameKey,
+    stack: MacCompatibilityStack,
+    availableDiskBytes: number
+  ): MacCompatibilityExperiment {
+    const release = this.resourceGuard.acquire(availableDiskBytes);
     const id = randomUUID();
     const experiment: MacCompatibilityExperiment = {
       id,
@@ -43,9 +62,15 @@ export class MacCompatibilityExperimentManager {
       finishedAt: null,
     };
 
-    this.registry.addExperiment(game, experiment);
-    this.registry.setSelectedStack(game, stack);
-    return experiment;
+    try {
+      this.registry.addExperiment(game, experiment);
+      this.registry.setSelectedStack(game, stack);
+      this.releases.set(id, release);
+      return experiment;
+    } catch (error) {
+      release();
+      throw error;
+    }
   }
 
   markRunning(game: MacCompatibilityGameKey, experimentId: string): void {
@@ -62,6 +87,7 @@ export class MacCompatibilityExperimentManager {
       notes,
       finishedAt: new Date().toISOString(),
     });
+    this.release(experimentId);
   }
 
   markFailed(
@@ -76,6 +102,7 @@ export class MacCompatibilityExperimentManager {
       notes,
       finishedAt: new Date().toISOString(),
     });
+    this.release(experimentId);
   }
 
   cancel(game: MacCompatibilityGameKey, experimentId: string): void {
@@ -83,12 +110,9 @@ export class MacCompatibilityExperimentManager {
       status: "cancelled",
       finishedAt: new Date().toISOString(),
     });
+    this.release(experimentId);
   }
 
-  /**
-   * Promotion is deliberately separate from passing. A caller must have
-   * already verified the real game working state before this method is used.
-   */
   promoteVerified(
     game: MacCompatibilityGameKey,
     experimentId: string,
@@ -138,5 +162,12 @@ export class MacCompatibilityExperimentManager {
 
   getLastKnownGood(game: MacCompatibilityGameKey) {
     return this.registry.getLastKnownGood(game);
+  }
+
+  private release(experimentId: string): void {
+    const release = this.releases.get(experimentId);
+    if (!release) return;
+    this.releases.delete(experimentId);
+    release();
   }
 }
