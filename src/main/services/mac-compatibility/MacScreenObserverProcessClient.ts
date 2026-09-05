@@ -22,19 +22,22 @@ export class MacScreenObserverProcessClient implements MacScreenObserver {
   }
 
   async captureWindow(windowId?: number): Promise<MacScreenObservationResult> {
-    return this.run(windowId);
+    const args = windowId === undefined ? [] : ["--window-id", String(windowId)];
+    return this.run(args);
+  }
+
+  async captureProcess(pid: number): Promise<MacScreenObservationResult> {
+    return this.run(["--pid", String(pid)]);
   }
 
   async captureFocusedGameWindow(): Promise<MacScreenObservationResult> {
-    return this.run();
+    return this.run([]);
   }
 
-  private async run(windowId?: number): Promise<MacScreenObservationResult> {
+  private async run(args: string[]): Promise<MacScreenObservationResult> {
     if (!this.helperPath || !(await this.isExecutable(this.helperPath))) {
       return this.unavailable("Native Mac screen observer is not installed.");
     }
-
-    const args = windowId === undefined ? [] : ["--window-id", String(windowId)];
 
     try {
       const { stdout } = await execFileAsync(this.helperPath, args, {
@@ -50,9 +53,7 @@ export class MacScreenObserverProcessClient implements MacScreenObserver {
       return parsed;
     } catch (error) {
       return this.unavailable(
-        error instanceof Error
-          ? error.message
-          : "Native screen observer failed."
+        error instanceof Error ? error.message : "Native screen observer failed."
       );
     }
   }
