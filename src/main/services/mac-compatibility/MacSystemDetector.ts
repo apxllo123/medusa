@@ -5,6 +5,7 @@ import type {
   MacArchitecture,
   MacSystemInfo,
 } from "./MacCompatibilityTypes.js";
+import { MacCompatibilityComponentDetector } from "./MacCompatibilityComponentDetector.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -57,9 +58,15 @@ const WINE_PROBE_PATHS = [
 
 export class MacSystemDetector {
   private readonly run: MacCommandRunner;
+  private readonly componentDetector: MacCompatibilityComponentDetector;
 
-  constructor(commandRunner: MacCommandRunner = defaultCommandRunner) {
+  constructor(
+    commandRunner: MacCommandRunner = defaultCommandRunner,
+    componentDetector?: MacCompatibilityComponentDetector
+  ) {
     this.run = commandRunner;
+    this.componentDetector =
+      componentDetector ?? new MacCompatibilityComponentDetector(commandRunner);
   }
 
   async detect(): Promise<MacSystemInfo> {
@@ -70,6 +77,11 @@ export class MacSystemDetector {
     const computerName = await this.getComputerName();
     const memoryBytes = await this.getMemoryBytes();
     const availableDiskBytes = await this.getAvailableDiskBytes();
+    const wineAvailable = await this.detectWine();
+    const protonAvailable = await this.commandExists("proton");
+    const rosettaAvailable = await this.detectRosetta(isAppleSilicon);
+    const compatibilityComponents =
+      await this.componentDetector.discoverInstalledComponents(architecture);
 
     return {
       platform: "macos",
@@ -80,9 +92,10 @@ export class MacSystemDetector {
       isIntel: architecture === "x64",
       memoryBytes,
       availableDiskBytes,
-      wineAvailable: await this.detectWine(),
-      protonAvailable: await this.commandExists("proton"),
-      rosettaAvailable: await this.detectRosetta(isAppleSilicon),
+      wineAvailable,
+      protonAvailable,
+      rosettaAvailable,
+      compatibilityComponents,
     };
   }
 
