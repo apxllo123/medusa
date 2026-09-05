@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import type {
   MacCompatibilityGameKey,
+  MacCompatibilityStack,
   MacGameCompatibility,
   MacWineEnvironment,
   MacWineVersion,
@@ -20,6 +21,7 @@ export interface MacGameLaunchResult {
   success: boolean;
   pid: number | null;
   compatibility: MacGameCompatibility;
+  compatibilityStack: MacCompatibilityStack | null;
   environment: MacWineEnvironment | null;
   wineVersion: MacWineVersion | null;
   message: string;
@@ -47,9 +49,31 @@ export class MacGameLaunchManager {
         success: true,
         pid: null,
         compatibility,
+        compatibilityStack: null,
         environment: null,
         wineVersion: null,
         message: "Native macOS game. No compatibility environment required.",
+      };
+    }
+
+    // A game that has a declared graphics requirement cannot fall through to
+    // ordinary Wine when no eligible stack exists. This is especially
+    // important for DX12 titles: a Wine prefix alone does not prove that a
+    // usable graphics translation backend is present.
+    if (
+      compatibility.issues.some(
+        (issue) => issue.code === "GRAPHICS_BACKEND_MISSING"
+      )
+    ) {
+      return {
+        success: false,
+        pid: null,
+        compatibility,
+        compatibilityStack: null,
+        environment: null,
+        wineVersion: null,
+        message:
+          "No compatible graphics backend is available for this game yet.",
       };
     }
 
@@ -59,20 +83,23 @@ export class MacGameLaunchManager {
 
     let wineVersions = await this.compatibilityManager.getWineVersions();
 
-    let wineVersion = this.findWineVersion(
-      environment?.wineVersionId ?? compatibility.recommendedWineVersionId,
-      wineVersions
-    );
+    const selectedRuntimeId =
+      compatibility.compatibilityStack?.runtimeComponentId ??
+      environment?.wineVersionId ??
+      compatibility.recommendedWineVersionId;
+
+    let wineVersion = this.findWineVersion(selectedRuntimeId, wineVersions);
 
     if (!wineVersion) {
       return {
         success: false,
         pid: null,
         compatibility,
+        compatibilityStack: compatibility.compatibilityStack ?? null,
         environment,
         wineVersion: null,
         message:
-          "No compatible Wine version is installed. Install Wine before launching this game.",
+          "No compatible Windows runtime is installed for the selected stack.",
       };
     }
 
@@ -83,16 +110,13 @@ export class MacGameLaunchManager {
         );
 
         wineVersions = await this.compatibilityManager.getWineVersions();
-
-        wineVersion = this.findWineVersion(
-          environment.wineVersionId,
-          wineVersions
-        );
+        wineVersion = this.findWineVersion(environment.wineVersionId, wineVersions);
       } catch (error) {
         return {
           success: false,
           pid: null,
           compatibility,
+          compatibilityStack: compatibility.compatibilityStack ?? null,
           environment: null,
           wineVersion,
           message: this.getErrorMessage(
@@ -108,33 +132,23 @@ export class MacGameLaunchManager {
         success: false,
         pid: null,
         compatibility,
+        compatibilityStack: compatibility.compatibilityStack ?? null,
         environment,
         wineVersion: null,
-        message: "The game's selected Wine version is no longer available.",
+        message: "The game's selected Windows runtime is no longer available.",
       };
     }
 
-    // The stored healthy flag is a memory of the last check, not a fact
-    // about right now: the prefix may have been deleted, moved, or left
-    // half-written since then, and Wine may have been upgraded or
-    // uninstalled. Trusting it here is what let a game be launched into
-    // a broken prefix and fail with no explanation, so the environment
-    // is always tested for real immediately before launch.
     const healthy = await this.compatibilityManager.testGameEnvironment(
       request.game
     );
 
-    // The test writes the corrected flags, so re-read the environment to
-    // report the true state back to the caller.
     environment =
       (await this.compatibilityManager.getGameEnvironment(request.game)) ??
       environment;
 
     if (!healthy) {
       try {
-        // repairGameEnvironment() re-tests after repairing and throws if
-        // the environment is still not usable, so reaching the next line
-        // means the prefix really works.
         environment = await this.compatibilityManager.repairGameEnvironment(
           request.game
         );
@@ -143,6 +157,7 @@ export class MacGameLaunchManager {
           success: false,
           pid: null,
           compatibility,
+          compatibilityStack: compatibility.compatibilityStack ?? null,
           environment,
           wineVersion,
           message: this.getErrorMessage(
@@ -157,6 +172,7 @@ export class MacGameLaunchManager {
       success: true,
       pid: null,
       compatibility,
+      compatibilityStack: compatibility.compatibilityStack ?? null,
       environment,
       wineVersion,
       message: "Compatibility environment is ready for launch.",
@@ -166,19 +182,14 @@ export class MacGameLaunchManager {
   async launch(request: MacGameLaunchRequest): Promise<MacGameLaunchResult> {
     const prepared = await this.prepareLaunch(request);
 
-    if (!prepared.success) {
-      return prepared;
-    }
-
-    if (!request.isWindowsGame) {
-      return this.launchNative(request, prepared);
-    }
+    if (!prepared.success) return prepared;
+    if (!request.isWindowsGame) return this.launchNative(request, prepared);
 
     if (!prepared.environment || !prepared.wineVersion) {
       return {
         ...prepared,
         success: false,
-        message: "The Windows game's Wine environment is not available.",
+        message: "The Windows game's compatibility environment is not available.",
       };
     }
 
@@ -186,7 +197,8 @@ export class MacGameLaunchManager {
       request,
       prepared,
       prepared.environment,
-      prepared.wineVersion
+      prepared.wineVersion,
+      prepared.compatibilityStack
     );
   }
 
@@ -196,22 +208,18 @@ export class MacGameLaunchManager {
   ): Promise<MacGameLaunchResult> {
     try {
       const workingDirectory = path.dirname(request.executablePath);
-
       const child = spawn(request.executablePath, request.args ?? [], {
         shell: false,
         detached: true,
         stdio: "ignore",
         cwd: workingDirectory,
-        env: {
-          ...process.env,
-        },
+        env: { ...process.env },
       });
 
       return await new Promise<MacGameLaunchResult>((resolve) => {
         const onSpawn = () => {
           child.off("error", onError);
           child.unref();
-
           resolve({
             ...prepared,
             success: true,
@@ -222,7 +230,6 @@ export class MacGameLaunchManager {
 
         const onError = (error: Error) => {
           child.off("spawn", onSpawn);
-
           resolve({
             ...prepared,
             success: false,
@@ -254,10 +261,27 @@ export class MacGameLaunchManager {
     request: MacGameLaunchRequest,
     prepared: MacGameLaunchResult,
     environment: MacWineEnvironment,
-    wineVersion: MacWineVersion
+    wineVersion: MacWineVersion,
+    stack: MacCompatibilityStack | null
   ): Promise<MacGameLaunchResult> {
     try {
       const workingDirectory = path.dirname(request.executablePath);
+      const env = {
+        ...process.env,
+        WINEPREFIX: environment.prefixPath,
+      };
+
+      if (stack?.runtimeFamily === "apple-gptk" && stack.graphicsComponentId) {
+        const systemInfo = await this.compatibilityManager.getSystemInfo();
+        const graphicsComponent =
+          systemInfo.compatibilityComponents?.find(
+            (component) => component.id === stack.graphicsComponentId
+          ) ?? null;
+
+        if (graphicsComponent?.executablePath) {
+          env.D3DMETAL_FRAMEWORK_PATH = graphicsComponent.executablePath;
+        }
+      }
 
       const child = spawn(
         wineVersion.executablePath,
@@ -267,10 +291,7 @@ export class MacGameLaunchManager {
           detached: true,
           stdio: "ignore",
           cwd: workingDirectory,
-          env: {
-            ...process.env,
-            WINEPREFIX: environment.prefixPath,
-          },
+          env,
         }
       );
 
@@ -279,24 +300,28 @@ export class MacGameLaunchManager {
           child.off("error", onError);
           child.unref();
 
+          const runtimeLabel =
+            stack?.runtimeFamily === "apple-gptk"
+              ? "Game Porting Toolkit + D3DMetal"
+              : wineVersion.name;
+
           resolve({
             ...prepared,
             success: true,
             pid: child.pid ?? null,
-            message: `Game launched with ${wineVersion.name}.`,
+            message: `Game launched with ${runtimeLabel}.`,
           });
         };
 
         const onError = (error: Error) => {
           child.off("spawn", onSpawn);
-
           resolve({
             ...prepared,
             success: false,
             pid: null,
             message: this.getErrorMessage(
               error,
-              "Failed to launch the Windows game with Wine."
+              "Failed to launch the Windows game with the selected compatibility stack."
             ),
           });
         };
@@ -311,7 +336,7 @@ export class MacGameLaunchManager {
         pid: null,
         message: this.getErrorMessage(
           error,
-          "Failed to launch the Windows game with Wine."
+          "Failed to launch the Windows game with the selected compatibility stack."
         ),
       };
     }
@@ -333,10 +358,6 @@ export class MacGameLaunchManager {
   }
 
   private getErrorMessage(error: unknown, fallback: string): string {
-    if (error instanceof Error && error.message) {
-      return error.message;
-    }
-
-    return fallback;
+    return error instanceof Error && error.message ? error.message : fallback;
   }
 }
