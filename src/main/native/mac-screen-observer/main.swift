@@ -16,6 +16,7 @@ struct ObservationResult: Codable {
     let captured: Bool
     let source: String
     let windowId: UInt32?
+    let windowTitle: String?
     let imagePath: String?
     let observations: [TextObservation]
     let combinedText: String
@@ -35,6 +36,7 @@ final class Observer {
                     captured: false,
                     source: "none",
                     windowId: nil,
+                    windowTitle: nil,
                     imagePath: nil,
                     observations: [],
                     combinedText: "",
@@ -71,6 +73,7 @@ final class Observer {
                 captured: true,
                 source: "window",
                 windowId: window.windowID,
+                windowTitle: window.title,
                 imagePath: nil,
                 observations: observations,
                 combinedText: combinedText,
@@ -81,6 +84,7 @@ final class Observer {
                 captured: false,
                 source: "none",
                 windowId: nil,
+                windowTitle: nil,
                 imagePath: nil,
                 observations: [],
                 combinedText: "",
@@ -164,7 +168,7 @@ struct MacScreenObserverMain {
                 FileHandle.standardOutput.write(data)
                 FileHandle.standardOutput.write(Data([0x0A]))
             } else {
-                fputs("{\"captured\":false,\"source\":\"none\",\"windowId\":null,\"imagePath\":null,\"observations\":[],\"combinedText\":\"\",\"error\":\"Failed to encode observation result.\"}\n", stderr)
+                fputs("{\"captured\":false,\"source\":\"none\",\"windowId\":null,\"windowTitle\":null,\"imagePath\":null,\"observations\":[],\"combinedText\":\"\",\"error\":\"Failed to encode observation result.\"}\n", stderr)
                 exit(1)
             }
         } else {
@@ -172,6 +176,7 @@ struct MacScreenObserverMain {
                 captured: false,
                 source: "none",
                 windowId: nil,
+                windowTitle: nil,
                 imagePath: nil,
                 observations: [],
                 combinedText: "",
