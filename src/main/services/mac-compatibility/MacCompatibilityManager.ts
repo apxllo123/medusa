@@ -1,7 +1,6 @@
 import type {
   MacCompatibilityCheckResult,
   MacCompatibilityGameKey,
-  MacCompatibilityStackCandidate,
   MacGameCompatibility,
   MacSystemInfo,
   MacWineEnvironment,
@@ -10,7 +9,10 @@ import type {
 import { MacCompatibilityRegistry } from "./MacCompatibilityRegistry.js";
 import { MacSystemDetector } from "./MacSystemDetector.js";
 import { MacWineDetector } from "./MacWineDetector.js";
-import { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
+import {
+  MacCompatibilityStackSelector,
+  type MacCompatibilityStackCandidate,
+} from "./MacCompatibilityStackSelector.js";
 import {
   MacWineEnvironmentManager,
   MacWineEnvironmentRepairer,
@@ -33,11 +35,6 @@ export class MacCompatibilityManager {
   private readonly environmentRepairer: MacWineEnvironmentRepairer;
   private readonly stackSelector: MacCompatibilityStackSelector;
 
-  // Optional-param DI, matching the pattern already used by
-  // MacGameLaunchManager: every dependency defaults to the real
-  // implementation, so `new MacCompatibilityManager()` behaves exactly
-  // as before, while tests can inject deterministic fakes for any
-  // subset of dependencies.
   constructor(dependencies?: MacCompatibilityManagerDependencies) {
     this.systemDetector =
       dependencies?.systemDetector ?? new MacSystemDetector();
@@ -124,13 +121,9 @@ export class MacCompatibilityManager {
       };
 
       this.registry.setStatus(game, result.status);
-
       return result;
     }
 
-    // Cheap correction pass before the stored flags are used for
-    // anything: if the prefix folder is gone, the environment reports
-    // itself unhealthy instead of showing a stale "ready".
     const environment =
       await this.environmentManager.refreshEnvironmentPresence(game);
 
@@ -170,7 +163,7 @@ export class MacCompatibilityManager {
     if (stackCandidates.length === 0 && recommendedWine) {
       recommendations.push({
         id: "no-compatible-stack",
-        title: "No verified compatibility stack is currently available",
+        title: "No compatible stack is currently available",
         description:
           "Medusa found a Wine runtime, but no stack candidate matched the detected host architecture. A different runtime or backend will be needed.",
         action: "change-wine",
@@ -204,11 +197,6 @@ export class MacCompatibilityManager {
     let level: MacGameCompatibility["level"] = "poor";
     let score = selectedStack?.confidence ?? null;
 
-    // An existing environment's health always takes precedence over
-    // Wine availability: a healthy environment is ready, and an
-    // unhealthy one needs repair regardless of whether a recommended
-    // Wine version happens to be installed. Only the "no environment
-    // at all" case falls through to needs_setup.
     if (environment?.healthy) {
       status = "ready";
       level = "good";
@@ -299,10 +287,6 @@ export class MacCompatibilityManager {
     return environment;
   }
 
-  /**
-   * Really tests the game's environment and writes the true result back,
-   * so a stale "healthy" flag cannot survive a test.
-   */
   async testGameEnvironment(game: MacCompatibilityGameKey): Promise<boolean> {
     const environment = await this.getGameEnvironment(game);
 
@@ -365,8 +349,6 @@ export class MacCompatibilityManager {
       throw new Error(result.message);
     }
 
-    // A successful repair is still verified before anything is marked
-    // ready, so "repaired" always means "tested and working".
     const { environment: repairedEnvironment, health } =
       await this.environmentManager.checkEnvironmentHealth(game, wineVersion);
 
@@ -375,7 +357,6 @@ export class MacCompatibilityManager {
     if (!health.healthy) {
       this.registry.setEnvironment(game, finalEnvironment);
       this.registry.setStatus(game, "needs_repair");
-
       throw new Error(health.message);
     }
 
