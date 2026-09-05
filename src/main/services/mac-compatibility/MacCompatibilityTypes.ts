@@ -94,7 +94,11 @@ export type MacCompatibilityAction =
   | "repair"
   | "create-environment"
   | "change-wine"
-  | "install-component";
+  | "install-component"
+  | "change-stack"
+  | "inspect-gpu-trace"
+  | "reset-shader-cache"
+  | "disable-overlays";
 
 export interface MacSystemInfo {
   platform: MacCompatibilityPlatform;
