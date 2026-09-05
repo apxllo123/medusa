@@ -119,25 +119,20 @@ function createGraphicsCandidates(): GraphicsArtifactCandidate[] {
         "D3DMetal.framework",
         "D3DMetal"
       ),
-      requiredPaths: [
-        join(externalPath, "libd3dshared.dylib"),
-        join(
-          appPath,
-          "Contents",
-          "Resources",
-          "wine",
-          "lib",
-          "x86_64-unix",
-          "d3d12.so"
-        ),
-      ],
+      requiredPaths: [join(externalPath, "libd3dshared.dylib")],
       architectures: ["arm64"],
       runtimeFamily: "apple-gptk",
       supportedGraphicsApis: ["d3d11", "d3d12"],
     });
   }
 
-  const crossoverExternal = join(CROSSOVER_ROOT, "lib64", "apple_gptk", "external");
+  const crossoverExternal = join(
+    CROSSOVER_ROOT,
+    "lib64",
+    "apple_gptk",
+    "external"
+  );
+
   candidates.push({
     id: "crossover-d3dmetal",
     name: "CrossOver D3DMetal",
@@ -225,7 +220,10 @@ export class MacCompatibilityComponentDetector {
     return components;
   }
 
-  private async pathsExist(primaryPath: string, requiredPaths: string[]): Promise<boolean> {
+  private async pathsExist(
+    primaryPath: string,
+    requiredPaths: string[]
+  ): Promise<boolean> {
     try {
       await access(primaryPath, constants.F_OK);
       for (const requiredPath of requiredPaths) {
