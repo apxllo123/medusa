@@ -14,12 +14,6 @@ interface ProcessObserverOptions {
   helperPath?: string;
 }
 
-/**
- * Node-side bridge to the native Swift screen observer. It deliberately
- * treats native capture as optional: the compatibility system keeps working
- * when Screen Recording permission is unavailable or the helper is not yet
- * packaged on a development machine.
- */
 export class MacScreenObserverProcessClient implements MacScreenObserver {
   private readonly helperPath?: string;
 
@@ -73,20 +67,13 @@ export class MacScreenObserverProcessClient implements MacScreenObserver {
   }
 
   private resolveDefaultHelperPath(): string | undefined {
-    if (process.platform !== "darwin") {
-      return undefined;
-    }
+    if (process.platform !== "darwin") return undefined;
 
     const candidates = [
       join(process.resourcesPath ?? "", "mac-screen-observer"),
+      join(process.cwd(), "mac-native", "mac-screen-observer"),
       join(process.cwd(), "src", "main", "native", "mac-screen-observer"),
-      join(
-        process.cwd(),
-        "out",
-        "main",
-        "native",
-        "mac-screen-observer"
-      ),
+      join(process.cwd(), "out", "main", "native", "mac-screen-observer"),
     ];
 
     return candidates.find((candidate) => candidate.length > 0);
@@ -97,6 +84,7 @@ export class MacScreenObserverProcessClient implements MacScreenObserver {
       captured: false,
       source: "none",
       windowId: null,
+      windowTitle: null,
       imagePath: null,
       observations: [],
       combinedText: "",
