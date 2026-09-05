@@ -2,6 +2,7 @@ import type {
   MacCompatibilityCheckResult,
   MacCompatibilityGameKey,
   MacGameCompatibility,
+  MacCompatibilityStack,
   MacSystemInfo,
   MacWineEnvironment,
   MacWineVersion,
@@ -100,7 +101,8 @@ export class MacCompatibilityManager {
           requirements,
         })
       : [];
-    const selectedStack = stackCandidates.find((candidate) => candidate.eligible)?.stack ?? null;
+    const selectedStack =
+      stackCandidates.find((candidate) => candidate.eligible)?.stack ?? null;
 
     const issues: MacGameCompatibility["issues"] = [];
     const recommendations: MacGameCompatibility["recommendations"] = [];
@@ -130,7 +132,6 @@ export class MacCompatibilityManager {
 
     const environment =
       await this.environmentManager.refreshEnvironmentPresence(game);
-
     const recommendedWine =
       wineVersions.find((wine) => wine.isRecommended) ?? wineVersions[0];
 
@@ -138,14 +139,13 @@ export class MacCompatibilityManager {
       issues.push({
         id: "wine-not-installed",
         code: "WINE_NOT_INSTALLED",
-        title: "Wine is not installed",
+        title: "Windows runtime is not installed",
         description:
-          "A Windows compatibility environment is required to run this game on macOS.",
+          "A compatible Windows runtime is required to run this game on macOS.",
         severity: "error",
         fixable: true,
         action: "create-environment",
       });
-
       recommendations.push({
         id: "install-wine",
         title: "Set up a Windows runtime",
@@ -170,12 +170,11 @@ export class MacCompatibilityManager {
         code: "GRAPHICS_BACKEND_MISSING",
         title: "Required graphics backend is not available",
         description:
-          `This title requires ${requirements.graphicsApis.join(", ")}, but no currently discovered compatible graphics backend can satisfy that requirement.`,
+          `This title requires ${requirements.graphicsApis.join(", ")}, but no discovered compatible graphics backend can satisfy that requirement.`,
         severity: "error",
         fixable: true,
         action: "install-component",
       });
-
       recommendations.push({
         id: "install-graphics-backend",
         title: "Set up a compatible graphics backend",
@@ -206,12 +205,10 @@ export class MacCompatibilityManager {
         fixable: true,
         action: "repair",
       });
-
       recommendations.push({
         id: "repair-environment",
         title: "Repair the compatibility environment",
-        description:
-          "Reinitialize the game's environment and test it again.",
+        description: "Reinitialize the game's environment and test it again.",
         action: "repair",
         priority: "high",
       });
@@ -221,17 +218,30 @@ export class MacCompatibilityManager {
     let level: MacGameCompatibility["level"] = "poor";
     let score = selectedStack?.confidence ?? null;
 
-    if (environment?.healthy && (!requirements?.graphicsApis.length || selectedStack)) {
+    if (
+      environment?.healthy &&
+      (!requirements?.graphicsApis.length || selectedStack)
+    ) {
       status = "ready";
       level = "good";
       score = Math.max(score ?? 0, 85);
     } else if (environment && !environment.healthy) {
       status = "needs_repair";
       level = "poor";
-      score = selectedStack ? Math.max(stackCandidates.find((candidate) => candidate.stack.id === selectedStack.id)?.score ?? 0, 40) : 25;
+      score = selectedStack
+        ? Math.max(
+            stackCandidates.find(
+              (candidate) => candidate.stack.id === selectedStack.id
+            )?.score ?? 0,
+            40
+          )
+        : 25;
     } else if (selectedStack) {
       level = "good";
-      score = stackCandidates.find((candidate) => candidate.stack.id === selectedStack.id)?.score ?? null;
+      score =
+        stackCandidates.find(
+          (candidate) => candidate.stack.id === selectedStack.id
+        )?.score ?? null;
     }
 
     const result: MacGameCompatibility = {
@@ -253,9 +263,7 @@ export class MacCompatibilityManager {
     };
 
     this.registry.setStatus(game, result.status);
-
     if (recommendedWine) this.registry.setWineVersion(game, recommendedWine.id);
-
     if (selectedStack) this.registry.setSelectedStack(game, selectedStack);
 
     return result;
@@ -267,7 +275,6 @@ export class MacCompatibilityManager {
     isWindowsGame: boolean
   ): Promise<MacCompatibilityCheckResult> {
     const result = await this.checkGame(game, title, isWindowsGame);
-
     return {
       status: result.status,
       issues: result.issues,
@@ -277,11 +284,20 @@ export class MacCompatibilityManager {
   }
 
   async createGameEnvironment(
-    game: MacCompatibilityGameKey
+    game: MacCompatibilityGameKey,
+    selectedStack?: MacCompatibilityStack | null
   ): Promise<MacWineEnvironment> {
     const wineVersions = await this.getWineVersions();
+    const desiredRuntimeId =
+      selectedStack?.runtimeComponentId ??
+      this.registry.get(game)?.selectedStack?.runtimeComponentId ??
+      null;
     const wineVersion =
-      wineVersions.find((wine) => wine.isRecommended) ?? wineVersions[0];
+      (desiredRuntimeId
+        ? wineVersions.find((wine) => wine.id === desiredRuntimeId)
+        : null) ??
+      wineVersions.find((wine) => wine.isRecommended) ??
+      wineVersions[0];
 
     if (!wineVersion) {
       throw new Error("No compatible Windows runtime is installed.");
@@ -294,6 +310,7 @@ export class MacCompatibilityManager {
 
     this.registry.setEnvironment(game, environment);
     this.registry.setWineVersion(game, wineVersion.id);
+    if (selectedStack) this.registry.setSelectedStack(game, selectedStack);
     this.registry.setStatus(game, environment.healthy ? "ready" : "needs_repair");
 
     return environment;
@@ -307,7 +324,9 @@ export class MacCompatibilityManager {
     }
 
     const wineVersions = await this.getWineVersions();
-    const wineVersion = wineVersions.find((wine) => wine.id === environment.wineVersionId);
+    const wineVersion = wineVersions.find(
+      (wine) => wine.id === environment.wineVersionId
+    );
 
     if (!wineVersion) {
       this.registry.setStatus(game, "needs_repair");
@@ -326,10 +345,14 @@ export class MacCompatibilityManager {
     game: MacCompatibilityGameKey
   ): Promise<MacWineEnvironment> {
     const environment = await this.getGameEnvironment(game);
-    if (!environment) throw new Error("No compatibility environment exists for this game.");
+    if (!environment) {
+      throw new Error("No compatibility environment exists for this game.");
+    }
 
     const wineVersions = await this.getWineVersions();
-    const wineVersion = wineVersions.find((wine) => wine.id === environment.wineVersionId);
+    const wineVersion = wineVersions.find(
+      (wine) => wine.id === environment.wineVersionId
+    );
 
     if (!wineVersion) {
       throw new Error("The runtime used by this environment is no longer installed.");
@@ -370,7 +393,15 @@ export class MacCompatibilityManager {
     return deleted;
   }
 
-  getRegistry(): MacCompatibilityRegistry { return this.registry; }
-  getEnvironmentManager(): MacWineEnvironmentManager { return this.environmentManager; }
-  getEnvironmentRepairer(): MacWineEnvironmentRepairer { return this.environmentRepairer; }
+  getRegistry(): MacCompatibilityRegistry {
+    return this.registry;
+  }
+
+  getEnvironmentManager(): MacWineEnvironmentManager {
+    return this.environmentManager;
+  }
+
+  getEnvironmentRepairer(): MacWineEnvironmentRepairer {
+    return this.environmentRepairer;
+  }
 }
