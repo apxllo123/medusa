@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'compatibility/**'
   pull_request:
     branches:
       - main
@@ -11,8 +12,8 @@ on:
 
 jobs:
   mac-compatibility:
-    name: Test Mac Compatibility
-    runs-on: macos-latest
+    name: Test Mac Compatibility (Apple Silicon)
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
@@ -32,24 +33,39 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: TypeScript type check
-        run: yarn tsc --noEmit -p tsconfig.node.json
+      - name: Node type check
+        run: yarn typecheck:node
 
-      - name: Run Mac compatibility tests
+      - name: Web type check
+        run: yarn typecheck:web
+
+      - name: Run compatibility tests
+        run: yarn test --test-name-pattern='MacCompatibility|MacWine|MacSystem|MacGame'
+
+      - name: Inspect Mac environment
         run: |
-          echo "=== macOS environment ==="
+          set -euo pipefail
+          echo "=== macOS ==="
           sw_vers
           echo ""
           echo "=== Architecture ==="
           uname -m
           echo ""
-          echo "=== Node.js ==="
-          node --version
+          echo "=== Apple Silicon capability ==="
+          sysctl -n hw.optional.arm64 || true
           echo ""
-          echo "=== Yarn ==="
-          yarn --version
+          echo "=== Rosetta state ==="
+          sysctl -n sysctl.proc_translated || true
+          echo ""
+          echo "=== Xcode / Metal ==="
+          xcodebuild -version || true
+          xcrun --find metal || true
+          xcrun --find gpucapture || true
+          xcrun --find gpudebug || true
+          echo ""
+          echo "=== Game Porting Toolkit candidates ==="
+          command -v gameportingtoolkit || true
+          command -v game-porting-toolkit || true
           echo ""
           echo "=== Mac compatibility source ==="
           find src/main/services/mac-compatibility -maxdepth 2 -type f | sort
-          echo ""
-          echo "=== Mac compatibility test complete ==="
