@@ -2,7 +2,11 @@ export { MacCompatibilityManager } from "./MacCompatibilityManager.js";
 export { MacCompatibilityRegistry } from "./MacCompatibilityRegistry.js";
 export { MacCompatibilityAnalyzer } from "./MacCompatibilityAnalyzer.js";
 export { MacCompatibilityComponentDetector } from "./MacCompatibilityComponentDetector.js";
-export { MacCompatibilityDiagnosticCollector } from "./MacCompatibilityDiagnosticCollector.js";
+export {
+  createDiagnosticRecord,
+  createProcessDiagnosticEvidence,
+  normalizeDiagnosticSignature,
+} from "./MacCompatibilityDiagnosticCollector.js";
 export { MacCompatibilityExperimentManager } from "./MacCompatibilityExperimentManager.js";
 export { MacCompatibilityRecoveryPlanner } from "./MacCompatibilityRecoveryPlanner.js";
 export { MacCompatibilityStackSelector } from "./MacCompatibilityStackSelector.js";
@@ -44,6 +48,7 @@ export type {
   MacCompatibilityPlatform,
   MacCompatibilityRecommendation,
   MacCompatibilityRegistryEntry,
+  MacCompatibilityRuntimeFamily,
   MacCompatibilityStack,
   MacCompatibilityStatus,
   MacGameCompatibility,
@@ -64,7 +69,10 @@ export type {
   MacCompatibilityStackProvisionerDependencies,
 } from "./MacCompatibilityStackProvisioner.js";
 
-export type { MacCompatibilityAnalysis, MacCompatibilityAnalyzerDependencies } from "./MacCompatibilityAnalyzer.js";
+export type {
+  MacCompatibilityAnalysis,
+  MacCompatibilityAnalyzerDependencies,
+} from "./MacCompatibilityAnalyzer.js";
 export type { MacCompatibilityRecoveryCandidate } from "./MacCompatibilityRecoveryPlanner.js";
 export type { MacGameRequirements } from "./MacGameRequirementsCatalog.js";
 export { getMacGameRequirements } from "./MacGameRequirementsCatalog.js";
