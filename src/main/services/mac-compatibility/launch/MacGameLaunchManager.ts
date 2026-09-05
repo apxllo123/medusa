@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import type {
@@ -8,6 +9,10 @@ import type {
   MacWineVersion,
 } from "../MacCompatibilityTypes.js";
 import { MacCompatibilityManager } from "../MacCompatibilityManager.js";
+import {
+  MacCompatibilityProcessLogger,
+  type MacCompatibilityProcessLogHandle,
+} from "../MacCompatibilityProcessLogger.js";
 
 export interface MacGameLaunchRequest {
   game: MacCompatibilityGameKey;
@@ -24,15 +29,21 @@ export interface MacGameLaunchResult {
   compatibilityStack: MacCompatibilityStack | null;
   environment: MacWineEnvironment | null;
   wineVersion: MacWineVersion | null;
+  logPaths: { stdout: string; stderr: string } | null;
   message: string;
 }
 
 export class MacGameLaunchManager {
   private readonly compatibilityManager: MacCompatibilityManager;
+  private readonly processLogger: MacCompatibilityProcessLogger;
 
-  constructor(compatibilityManager?: MacCompatibilityManager) {
+  constructor(
+    compatibilityManager?: MacCompatibilityManager,
+    processLogger?: MacCompatibilityProcessLogger
+  ) {
     this.compatibilityManager =
       compatibilityManager ?? new MacCompatibilityManager();
+    this.processLogger = processLogger ?? new MacCompatibilityProcessLogger();
   }
 
   async prepareLaunch(
@@ -52,6 +63,7 @@ export class MacGameLaunchManager {
         compatibilityStack: null,
         environment: null,
         wineVersion: null,
+        logPaths: null,
         message: "Native macOS game. No compatibility environment required.",
       };
     }
@@ -68,6 +80,7 @@ export class MacGameLaunchManager {
         compatibilityStack: null,
         environment: null,
         wineVersion: null,
+        logPaths: null,
         message:
           "No compatible graphics backend is available for this game yet.",
       };
@@ -94,6 +107,7 @@ export class MacGameLaunchManager {
         compatibilityStack: compatibility.compatibilityStack ?? null,
         environment,
         wineVersion: null,
+        logPaths: null,
         message:
           "No compatible Windows runtime is installed for the selected stack.",
       };
@@ -119,6 +133,7 @@ export class MacGameLaunchManager {
           compatibilityStack: compatibility.compatibilityStack ?? null,
           environment: null,
           wineVersion,
+          logPaths: null,
           message: this.getErrorMessage(
             error,
             "Failed to create the game's compatibility environment."
@@ -135,6 +150,7 @@ export class MacGameLaunchManager {
         compatibilityStack: compatibility.compatibilityStack ?? null,
         environment,
         wineVersion: null,
+        logPaths: null,
         message: "The game's selected Windows runtime is no longer available.",
       };
     }
@@ -160,6 +176,7 @@ export class MacGameLaunchManager {
           compatibilityStack: compatibility.compatibilityStack ?? null,
           environment,
           wineVersion,
+          logPaths: null,
           message: this.getErrorMessage(
             error,
             "The game's compatibility environment needs repair."
@@ -175,6 +192,7 @@ export class MacGameLaunchManager {
       compatibilityStack: compatibility.compatibilityStack ?? null,
       environment,
       wineVersion,
+      logPaths: null,
       message: "Compatibility environment is ready for launch.",
     };
   }
@@ -189,7 +207,8 @@ export class MacGameLaunchManager {
       return {
         ...prepared,
         success: false,
-        message: "The Windows game's compatibility environment is not available.",
+        message:
+          "The Windows game's compatibility environment is not available.",
       };
     }
 
@@ -264,6 +283,8 @@ export class MacGameLaunchManager {
     wineVersion: MacWineVersion,
     stack: MacCompatibilityStack | null
   ): Promise<MacGameLaunchResult> {
+    let logs: MacCompatibilityProcessLogHandle | null = null;
+
     try {
       const workingDirectory = path.dirname(request.executablePath);
       const env = {
@@ -283,13 +304,15 @@ export class MacGameLaunchManager {
         }
       }
 
+      logs = this.processLogger.open(request.game, randomUUID());
+
       const child = spawn(
         wineVersion.executablePath,
         [request.executablePath, ...(request.args ?? [])],
         {
           shell: false,
           detached: true,
-          stdio: "ignore",
+          stdio: ["ignore", logs.stdoutFd, logs.stderrFd],
           cwd: workingDirectory,
           env,
         }
@@ -298,6 +321,7 @@ export class MacGameLaunchManager {
       return await new Promise<MacGameLaunchResult>((resolve) => {
         const onSpawn = () => {
           child.off("error", onError);
+          this.processLogger.close(logs!);
           child.unref();
 
           const runtimeLabel =
@@ -309,31 +333,46 @@ export class MacGameLaunchManager {
             ...prepared,
             success: true,
             pid: child.pid ?? null,
+            logPaths: {
+              stdout: logs!.stdoutPath,
+              stderr: logs!.stderrPath,
+            },
             message: `Game launched with ${runtimeLabel}.`,
           });
+          logs = null;
         };
 
         const onError = (error: Error) => {
           child.off("spawn", onSpawn);
+          this.processLogger.close(logs!);
           resolve({
             ...prepared,
             success: false,
             pid: null,
+            logPaths: {
+              stdout: logs!.stdoutPath,
+              stderr: logs!.stderrPath,
+            },
             message: this.getErrorMessage(
               error,
               "Failed to launch the Windows game with the selected compatibility stack."
             ),
           });
+          logs = null;
         };
 
         child.once("spawn", onSpawn);
         child.once("error", onError);
       });
     } catch (error) {
+      if (logs) this.processLogger.close(logs);
       return {
         ...prepared,
         success: false,
         pid: null,
+        logPaths: logs
+          ? { stdout: logs.stdoutPath, stderr: logs.stderrPath }
+          : null,
         message: this.getErrorMessage(
           error,
           "Failed to launch the Windows game with the selected compatibility stack."
