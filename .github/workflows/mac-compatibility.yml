@@ -39,6 +39,9 @@ jobs:
       - name: Web type check
         run: yarn typecheck:web
 
+      - name: Compile native Mac screen observer
+        run: node scripts/build-mac-screen-observer.cjs
+
       - name: Run compatibility tests
         run: yarn test --test-name-pattern='MacCompatibility|MacWine|MacSystem|MacGame'
 
