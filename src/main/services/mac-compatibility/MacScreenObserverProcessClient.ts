@@ -22,7 +22,8 @@ export class MacScreenObserverProcessClient implements MacScreenObserver {
   }
 
   async captureWindow(windowId?: number): Promise<MacScreenObservationResult> {
-    const args = windowId === undefined ? [] : ["--window-id", String(windowId)];
+    const args =
+      windowId === undefined ? [] : ["--window-id", String(windowId)];
     return this.run(args);
   }
 
@@ -47,13 +48,17 @@ export class MacScreenObserverProcessClient implements MacScreenObserver {
 
       const parsed = JSON.parse(stdout) as MacScreenObservationResult;
       if (!parsed || typeof parsed !== "object") {
-        return this.unavailable("Native screen observer returned invalid data.");
+        return this.unavailable(
+          "Native screen observer returned invalid data."
+        );
       }
 
       return parsed;
     } catch (error) {
       return this.unavailable(
-        error instanceof Error ? error.message : "Native screen observer failed."
+        error instanceof Error
+          ? error.message
+          : "Native screen observer failed."
       );
     }
   }

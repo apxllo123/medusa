@@ -111,7 +111,10 @@ export async function assertManagedPrefixPath(
   const realRoot = (await realpathIfExists(resolvedRoot)) ?? resolvedRoot;
   const realTarget = await realpathIfExists(resolvedTarget);
 
-  if (realTarget !== null && (realTarget === realRoot || !isContainedIn(realRoot, realTarget))) {
+  if (
+    realTarget !== null &&
+    (realTarget === realRoot || !isContainedIn(realRoot, realTarget))
+  ) {
     throw new Error(
       `Refusing to modify a Wine environment: "${resolvedTarget}" really points at "${realTarget}", which is outside "${realRoot}".`
     );

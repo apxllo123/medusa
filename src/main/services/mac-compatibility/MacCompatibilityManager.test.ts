@@ -6,6 +6,8 @@ import { MacCompatibilityManager } from "./MacCompatibilityManager.ts";
 // @ts-ignore The Node ESM test runner requires the source extension.
 import type {
   MacCompatibilityGameKey,
+  MacCompatibilityRegistryEntry,
+  MacCompatibilityStack,
   MacCompatibilityStatus,
   MacSystemInfo,
   MacWineEnvironment,
@@ -89,6 +91,10 @@ class FakeRegistry {
     game: MacCompatibilityGameKey;
     environment: MacWineEnvironment | null;
   }> = [];
+  public selectedStackCalls: Array<{
+    game: MacCompatibilityGameKey;
+    stack: MacCompatibilityStack | null;
+  }> = [];
 
   setStatus(game: MacCompatibilityGameKey, status: MacCompatibilityStatus) {
     this.statusCalls.push({ game, status });
@@ -103,6 +109,17 @@ class FakeRegistry {
     environment: MacWineEnvironment | null
   ) {
     this.environmentCalls.push({ game, environment });
+  }
+
+  setSelectedStack(
+    game: MacCompatibilityGameKey,
+    stack: MacCompatibilityStack | null
+  ) {
+    this.selectedStackCalls.push({ game, stack });
+  }
+
+  get(_game: MacCompatibilityGameKey): MacCompatibilityRegistryEntry | null {
+    return null;
   }
 
   get lastStatus(): MacCompatibilityStatus | null {

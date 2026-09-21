@@ -311,7 +311,7 @@ export class MacGameLaunchManager {
 
     try {
       const workingDirectory = path.dirname(request.executablePath);
-      const env = {
+      const env: NodeJS.ProcessEnv = {
         ...process.env,
         WINEPREFIX: environment.prefixPath,
       };

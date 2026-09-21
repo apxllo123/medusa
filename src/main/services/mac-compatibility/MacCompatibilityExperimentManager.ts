@@ -41,7 +41,8 @@ export class MacCompatibilityExperimentManager {
     this.resourceGuard =
       dependencies?.resourceGuard ??
       new MacCompatibilityResourceGuard(
-        dependencies?.resourceBudget ?? DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET
+        dependencies?.resourceBudget ??
+          DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET
       );
   }
 
@@ -124,7 +125,9 @@ export class MacCompatibilityExperimentManager {
       .find((candidate) => candidate.id === experimentId);
 
     if (!experiment) {
-      throw new Error(`Compatibility experiment ${experimentId} was not found.`);
+      throw new Error(
+        `Compatibility experiment ${experimentId} was not found.`
+      );
     }
 
     if (experiment.status !== "passed") {
@@ -164,7 +167,9 @@ export class MacCompatibilityExperimentManager {
     this.registry.addDiagnostic(game, diagnostic);
   }
 
-  getDiagnostics(game: MacCompatibilityGameKey): MacCompatibilityDiagnosticRecord[] {
+  getDiagnostics(
+    game: MacCompatibilityGameKey
+  ): MacCompatibilityDiagnosticRecord[] {
     return this.registry.getDiagnostics(game);
   }
 
