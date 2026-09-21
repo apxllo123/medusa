@@ -15,7 +15,12 @@ export interface MacCompatibilityDiagnosticRecord {
   createdAt: string;
 }
 
-const ANSI_ESCAPE_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/g;
+// The ESC escape cannot be written literally in a regex under no-control-regex.
+const ANSI_ESCAPE_CHARACTER = String.fromCharCode(0x1b);
+const ANSI_ESCAPE_PATTERN = new RegExp(
+  `${ANSI_ESCAPE_CHARACTER}\\[[0-?]*[ -/]*[@-~]`,
+  "g"
+);
 const WHITESPACE_PATTERN = /\s+/g;
 
 export function normalizeDiagnosticSignature(text: string): string | null {
