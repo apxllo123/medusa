@@ -40,7 +40,8 @@ const gptkWine: MacWineVersion = {
   name: "Game Porting Toolkit Wine",
   version: "wine-test-gptk",
   type: "wine",
-  executablePath: "/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/wine64",
+  executablePath:
+    "/Applications/Game Porting Toolkit.app/Contents/Resources/wine/bin/wine64",
   isInstalled: true,
   isRecommended: true,
   architecture: "x64",
@@ -106,7 +107,9 @@ describe("MacCompatibilityStackSelector", () => {
     assert.equal(candidates[0]?.stack.id, "wine:wine-arm");
     assert.equal(candidates[0]?.eligible, true);
     assert.ok((candidates[0]?.score ?? 0) > (candidates[1]?.score ?? 0));
-    assert.ok(candidates[0]?.stack.toolingComponentIds.includes("apple-metal-compiler"));
+    assert.ok(
+      candidates[0]?.stack.toolingComponentIds.includes("apple-metal-compiler")
+    );
   });
 
   it("does not select an incompatible runtime architecture", () => {
@@ -131,7 +134,10 @@ describe("MacCompatibilityStackSelector", () => {
 
     assert.equal(candidates[0]?.stack.confidence, null);
     assert.equal(candidates[0]?.stack.id, "wine:wine-arm");
-    assert.match(candidates[0]?.reasons.join(" ") ?? "", /stored preferred stack/i);
+    assert.match(
+      candidates[0]?.reasons.join(" ") ?? "",
+      /stored preferred stack/i
+    );
   });
 
   it("marks Black Flag Resynced ineligible when no DX12 backend exists", () => {

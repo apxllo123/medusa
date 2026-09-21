@@ -17,10 +17,7 @@ export type CompatibilityCommandRunner = (
   args: string[]
 ) => Promise<string>;
 
-const defaultCommandRunner: CompatibilityCommandRunner = async (
-  file,
-  args
-) => {
+const defaultCommandRunner: CompatibilityCommandRunner = async (file, args) => {
   const { stdout, stderr } = await execFileAsync(file, args, {
     timeout: COMMAND_TIMEOUT_MS,
   });
@@ -43,7 +40,9 @@ interface GraphicsArtifactCandidate {
   requiredPaths: string[];
   architectures: MacArchitecture[];
   runtimeFamily: MacCompatibilityRuntimeFamily;
-  supportedGraphicsApis: NonNullable<MacCompatibilityComponent["supportedGraphicsApis"]>;
+  supportedGraphicsApis: NonNullable<
+    MacCompatibilityComponent["supportedGraphicsApis"]
+  >;
 }
 
 const TOOL_CANDIDATES: ToolCandidate[] = [
@@ -114,11 +113,7 @@ function createGraphicsCandidates(): GraphicsArtifactCandidate[] {
     candidates.push({
       id: "apple-d3dmetal",
       name: "Apple D3DMetal (Game Porting Toolkit)",
-      primaryPath: join(
-        externalPath,
-        "D3DMetal.framework",
-        "D3DMetal"
-      ),
+      primaryPath: join(externalPath, "D3DMetal.framework", "D3DMetal"),
       requiredPaths: [join(externalPath, "libd3dshared.dylib")],
       architectures: ["arm64"],
       runtimeFamily: "apple-gptk",
@@ -136,11 +131,7 @@ function createGraphicsCandidates(): GraphicsArtifactCandidate[] {
   candidates.push({
     id: "crossover-d3dmetal",
     name: "CrossOver D3DMetal",
-    primaryPath: join(
-      crossoverExternal,
-      "D3DMetal.framework",
-      "D3DMetal"
-    ),
+    primaryPath: join(crossoverExternal, "D3DMetal.framework", "D3DMetal"),
     requiredPaths: [join(crossoverExternal, "libd3dshared.dylib")],
     architectures: ["arm64", "x64"],
     runtimeFamily: "crossover",
@@ -174,9 +165,7 @@ export class MacCompatibilityComponentDetector {
       if (!executablePath) continue;
 
       const componentId =
-        candidate.id === "apple-gptk-hyphenated"
-          ? "apple-gptk"
-          : candidate.id;
+        candidate.id === "apple-gptk-hyphenated" ? "apple-gptk" : candidate.id;
 
       if (seenIds.has(componentId)) continue;
       seenIds.add(componentId);

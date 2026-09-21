@@ -154,17 +154,23 @@ class FakeExperimentManager {
   }
 
   markRunning(_game: MacCompatibilityGameKey, id: string) {
-    const experiment = this.experiments.find((candidate) => candidate.id === id);
+    const experiment = this.experiments.find(
+      (candidate) => candidate.id === id
+    );
     if (experiment) experiment.status = "running";
   }
 
   markPassed(_game: MacCompatibilityGameKey, id: string) {
-    const experiment = this.experiments.find((candidate) => candidate.id === id);
+    const experiment = this.experiments.find(
+      (candidate) => candidate.id === id
+    );
     if (experiment) experiment.status = "passed";
   }
 
   markFailed(_game: MacCompatibilityGameKey, id: string, signature: string) {
-    const experiment = this.experiments.find((candidate) => candidate.id === id);
+    const experiment = this.experiments.find(
+      (candidate) => candidate.id === id
+    );
     if (experiment) {
       experiment.status = "failed";
       experiment.failureSignature = signature;
@@ -249,13 +255,19 @@ const build = (verified: boolean) => {
   const experimentManager = new FakeExperimentManager();
   const dependencies: MacCompatibilityRecoveryEngineDependencies = {
     analyzer: new FakeAnalyzer() as unknown as MacCompatibilityAnalyzer,
-    provisioner: new FakeProvisioner() as unknown as MacCompatibilityStackProvisioner,
-    experimentManager: experimentManager as unknown as MacCompatibilityExperimentManager,
-    recoveryPlanner: new FakePlanner() as unknown as MacCompatibilityRecoveryPlanner,
+    provisioner:
+      new FakeProvisioner() as unknown as MacCompatibilityStackProvisioner,
+    experimentManager:
+      experimentManager as unknown as MacCompatibilityExperimentManager,
+    recoveryPlanner:
+      new FakePlanner() as unknown as MacCompatibilityRecoveryPlanner,
     launchManager: new FakeLaunchManager() as unknown as MacGameLaunchManager,
-    processLogger: new FakeProcessLogger() as unknown as MacCompatibilityProcessLogger,
+    processLogger:
+      new FakeProcessLogger() as unknown as MacCompatibilityProcessLogger,
     screenObserver: new FakeObserver() as unknown as MacScreenObserver,
-    workingStateVerifier: new FakeVerifier(verified) as unknown as MacCompatibilityWorkingStateVerifier,
+    workingStateVerifier: new FakeVerifier(
+      verified
+    ) as unknown as MacCompatibilityWorkingStateVerifier,
   };
 
   return {

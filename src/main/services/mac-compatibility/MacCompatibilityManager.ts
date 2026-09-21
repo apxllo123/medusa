@@ -38,7 +38,8 @@ export class MacCompatibilityManager {
   private readonly stackSelector: MacCompatibilityStackSelector;
 
   constructor(dependencies?: MacCompatibilityManagerDependencies) {
-    this.systemDetector = dependencies?.systemDetector ?? new MacSystemDetector();
+    this.systemDetector =
+      dependencies?.systemDetector ?? new MacSystemDetector();
     this.wineDetector = dependencies?.wineDetector ?? new MacWineDetector();
     this.registry = dependencies?.registry ?? new MacCompatibilityRegistry();
     this.environmentManager =
@@ -158,7 +159,8 @@ export class MacCompatibilityManager {
       recommendations.push({
         id: "create-game-environment",
         title: "Create a game environment",
-        description: "Create a dedicated compatibility environment for this game.",
+        description:
+          "Create a dedicated compatibility environment for this game.",
         action: "create-environment",
         priority: "high",
       });
@@ -169,8 +171,7 @@ export class MacCompatibilityManager {
         id: "graphics-backend-missing",
         code: "GRAPHICS_BACKEND_MISSING",
         title: "Required graphics backend is not available",
-        description:
-          `This title requires ${requirements.graphicsApis.join(", ")}, but no discovered compatible graphics backend can satisfy that requirement.`,
+        description: `This title requires ${requirements.graphicsApis.join(", ")}, but no discovered compatible graphics backend can satisfy that requirement.`,
         severity: "error",
         fixable: true,
         action: "install-component",
@@ -178,8 +179,7 @@ export class MacCompatibilityManager {
       recommendations.push({
         id: "install-graphics-backend",
         title: "Set up a compatible graphics backend",
-        description:
-          `Medusa needs a verified ${requirements.graphicsApis.join(", ")} translation backend for this game.`,
+        description: `Medusa needs a verified ${requirements.graphicsApis.join(", ")} translation backend for this game.`,
         action: "install-component",
         priority: "high",
       });
@@ -311,7 +311,10 @@ export class MacCompatibilityManager {
     this.registry.setEnvironment(game, environment);
     this.registry.setWineVersion(game, wineVersion.id);
     if (selectedStack) this.registry.setSelectedStack(game, selectedStack);
-    this.registry.setStatus(game, environment.healthy ? "ready" : "needs_repair");
+    this.registry.setStatus(
+      game,
+      environment.healthy ? "ready" : "needs_repair"
+    );
 
     return environment;
   }
@@ -336,7 +339,8 @@ export class MacCompatibilityManager {
     const { environment: checkedEnvironment, health } =
       await this.environmentManager.checkEnvironmentHealth(game, wineVersion);
 
-    if (checkedEnvironment) this.registry.setEnvironment(game, checkedEnvironment);
+    if (checkedEnvironment)
+      this.registry.setEnvironment(game, checkedEnvironment);
     this.registry.setStatus(game, health.healthy ? "ready" : "needs_repair");
     return health.healthy;
   }
@@ -355,7 +359,9 @@ export class MacCompatibilityManager {
     );
 
     if (!wineVersion) {
-      throw new Error("The runtime used by this environment is no longer installed.");
+      throw new Error(
+        "The runtime used by this environment is no longer installed."
+      );
     }
 
     const result = await this.environmentRepairer.repair(

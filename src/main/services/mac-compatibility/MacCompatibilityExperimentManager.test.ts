@@ -99,7 +99,7 @@ describe("MacCompatibilityExperimentManager", () => {
 
     assert.equal(experiment.status, "pending");
     assert.match(experiment.prefixPath ?? "", /black-flag-resynced-test/);
-    assert.match(experiment.prefixPath ?? "", experiment.id);
+    assert.ok((experiment.prefixPath ?? "").includes(experiment.id));
     assert.equal(registry.getExperiments().length, 1);
   });
 
@@ -140,7 +140,10 @@ describe("MacCompatibilityExperimentManager", () => {
 
     manager.start(GAME, STACK, 100);
 
-    assert.throws(() => manager.start(GAME, STACK, 100), /resource safety budget/i);
+    assert.throws(
+      () => manager.start(GAME, STACK, 100),
+      /resource safety budget/i
+    );
   });
 
   it("releases the experiment slot when an experiment finishes", () => {

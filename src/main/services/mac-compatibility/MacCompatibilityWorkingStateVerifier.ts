@@ -44,6 +44,12 @@ export interface MacCompatibilityWorkingStateVerifierDependencies {
   screenObserver: MacScreenObserver;
 }
 
+export interface MacCompatibilityWorkingStateResult {
+  verified: boolean;
+  reason: string;
+  observation: MacScreenObservationResult;
+}
+
 export class MacCompatibilityWorkingStateVerifier {
   private readonly screenObserver: MacScreenObserver;
 

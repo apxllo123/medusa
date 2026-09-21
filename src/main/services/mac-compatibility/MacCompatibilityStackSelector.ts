@@ -1,5 +1,4 @@
 import type {
-  MacArchitecture,
   MacCompatibilityComponent,
   MacCompatibilityStack,
   MacCompatibilityRuntimeFamily,
@@ -29,7 +28,9 @@ export interface MacCompatibilityStackSelectionInput {
  * with the selected runtime family when that coupling is known.
  */
 export class MacCompatibilityStackSelector {
-  select(input: MacCompatibilityStackSelectionInput): MacCompatibilityStackCandidate[] {
+  select(
+    input: MacCompatibilityStackSelectionInput
+  ): MacCompatibilityStackCandidate[] {
     const candidates: MacCompatibilityStackCandidate[] = [];
     const graphicsComponents = input.components.filter(
       (component) => component.type === "graphics" && component.isInstalled
@@ -78,10 +79,15 @@ export class MacCompatibilityStackSelector {
       ) {
         score += 6;
         reasons.push("Rosetta is available for the x86_64 runtime.");
-      } else if (wine.architecture === "x64" && input.systemInfo.isAppleSilicon) {
+      } else if (
+        wine.architecture === "x64" &&
+        input.systemInfo.isAppleSilicon
+      ) {
         eligible = false;
         score = Math.min(score, 20);
-        reasons.push("x86_64 runtime requires Rosetta on Apple Silicon, but Rosetta was not detected.");
+        reasons.push(
+          "x86_64 runtime requires Rosetta on Apple Silicon, but Rosetta was not detected."
+        );
       }
 
       if (input.preferredStackId === stack.id) {
@@ -168,7 +174,9 @@ export class MacCompatibilityStackSelector {
 
   private findToolingIds(components: MacCompatibilityComponent[]): string[] {
     return components
-      .filter((component) => component.type === "tooling" && component.isInstalled)
+      .filter(
+        (component) => component.type === "tooling" && component.isInstalled
+      )
       .map((component) => component.id)
       .sort();
   }

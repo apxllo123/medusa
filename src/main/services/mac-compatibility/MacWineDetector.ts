@@ -130,7 +130,9 @@ export class MacWineDetector {
     const seenExecutablePaths = new Set<string>();
 
     for (const candidate of this.candidates) {
-      const resolvedPath = await this.resolveExecutable(candidate.executablePath);
+      const resolvedPath = await this.resolveExecutable(
+        candidate.executablePath
+      );
       if (!resolvedPath || seenExecutablePaths.has(resolvedPath)) continue;
 
       seenExecutablePaths.add(resolvedPath);
@@ -163,7 +165,9 @@ export class MacWineDetector {
     return (await this.detectInstalledVersions()).length > 0;
   }
 
-  private async resolveGptkLauncher(wineExecutablePath: string): Promise<string | null> {
+  private async resolveGptkLauncher(
+    wineExecutablePath: string
+  ): Promise<string | null> {
     const candidatePaths = [
       await this.resolveFromPath("gameportingtoolkit"),
       await this.resolveFromPath("game-porting-toolkit"),
@@ -185,7 +189,9 @@ export class MacWineDetector {
     return null;
   }
 
-  private async resolveExecutable(executablePath: string): Promise<string | null> {
+  private async resolveExecutable(
+    executablePath: string
+  ): Promise<string | null> {
     const absolutePath = executablePath.startsWith("/")
       ? executablePath
       : await this.resolveFromPath(executablePath);
