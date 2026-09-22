@@ -140,7 +140,10 @@ describe("MacCompatibilityExperimentManager", () => {
 
     manager.start(GAME, STACK, 100);
 
-    assert.throws(() => manager.start(GAME, STACK, 100), /resource safety budget/i);
+    assert.throws(
+      () => manager.start(GAME, STACK, 100),
+      /resource safety budget/i
+    );
   });
 
   it("releases the experiment slot when an experiment finishes", () => {

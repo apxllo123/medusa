@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - main
-      - 'compatibility/**'
+      - "compatibility/**"
   workflow_dispatch:
 
 jobs:

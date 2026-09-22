@@ -80,8 +80,7 @@ class FakeEnvironmentManager {
 const build = (environment: MacWineEnvironment | null) => {
   const fake = new FakeEnvironmentManager(environment);
   const dependencies: MacCompatibilityStackProvisionerDependencies = {
-    environmentManager:
-      fake as unknown as MacWineEnvironmentManager,
+    environmentManager: fake as unknown as MacWineEnvironmentManager,
   };
   return {
     fake,
@@ -142,8 +141,7 @@ describe("MacCompatibilityStackProvisioner", () => {
 
     const fake = new UnhealthyEnvironmentManager(null);
     const provisioner = new MacCompatibilityStackProvisioner({
-      environmentManager:
-        fake as unknown as MacWineEnvironmentManager,
+      environmentManager: fake as unknown as MacWineEnvironmentManager,
     });
 
     const result = await provisioner.provision(GAME, CANDIDATE, [WINE]);

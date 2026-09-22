@@ -1,4 +1,10 @@
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { MacCompatibilityGameKey } from "./MacCompatibilityTypes.js";
@@ -31,7 +37,10 @@ export class MacCompatibilityProcessLogger {
     this.root = root;
   }
 
-  open(game: MacCompatibilityGameKey, runId: string): MacCompatibilityProcessLogHandle {
+  open(
+    game: MacCompatibilityGameKey,
+    runId: string
+  ): MacCompatibilityProcessLogHandle {
     const directory = join(this.root, game.shop, game.objectId);
     mkdirSync(directory, { recursive: true });
 
@@ -61,9 +70,7 @@ export class MacCompatibilityProcessLogger {
 
     try {
       const contents = readFileSync(path, "utf8");
-      return contents.length > maxBytes
-        ? contents.slice(-maxBytes)
-        : contents;
+      return contents.length > maxBytes ? contents.slice(-maxBytes) : contents;
     } catch {
       return "";
     }

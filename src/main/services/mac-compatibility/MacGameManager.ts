@@ -35,9 +35,7 @@ export class MacGameManager {
     return this.compatibilityManager.checkGame(game, title, isWindowsGame);
   }
 
-  async getEnvironment(
-    game: MacCompatibilityGameKey
-  ) {
+  async getEnvironment(game: MacCompatibilityGameKey) {
     return this.compatibilityManager.getGameEnvironment(game);
   }
 

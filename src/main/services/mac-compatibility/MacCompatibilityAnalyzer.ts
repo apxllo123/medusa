@@ -43,8 +43,7 @@ export class MacCompatibilityAnalyzer {
   constructor(dependencies?: MacCompatibilityAnalyzerDependencies) {
     this.systemDetector =
       dependencies?.systemDetector ?? new MacSystemDetector();
-    this.wineDetector =
-      dependencies?.wineDetector ?? new MacWineDetector();
+    this.wineDetector = dependencies?.wineDetector ?? new MacWineDetector();
     this.registry = dependencies?.registry ?? new MacCompatibilityRegistry();
     this.selector =
       dependencies?.selector ?? new MacCompatibilityStackSelector();

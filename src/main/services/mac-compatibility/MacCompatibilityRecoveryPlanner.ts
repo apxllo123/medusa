@@ -44,7 +44,8 @@ export class MacCompatibilityRecoveryPlanner {
         id: "inspect-gpu-trace",
         action: "inspect-gpu-trace",
         title: "Inspect the GPU workload",
-        reason: "A graphics-device failure can require Metal/GPU trace evidence before choosing the next fix.",
+        reason:
+          "A graphics-device failure can require Metal/GPU trace evidence before choosing the next fix.",
         priority: 80,
       });
     }
@@ -69,12 +70,15 @@ export class MacCompatibilityRecoveryPlanner {
       });
     }
 
-    if (/PREFIX|WINE|WINEDLLOVERRIDES|WINEBOOT|SYSTEM\.REG|DRIVE_C/.test(text)) {
+    if (
+      /PREFIX|WINE|WINEDLLOVERRIDES|WINEBOOT|SYSTEM\.REG|DRIVE_C/.test(text)
+    ) {
       candidates.push({
         id: "repair-compatibility-environment",
         action: "repair",
         title: "Repair the compatibility environment",
-        reason: "The evidence points to a runtime/prefix initialization problem.",
+        reason:
+          "The evidence points to a runtime/prefix initialization problem.",
         priority: 75,
       });
     }
@@ -84,7 +88,8 @@ export class MacCompatibilityRecoveryPlanner {
         id: "try-next-ranked-stack",
         action: "change-stack",
         title: "Try the next ranked compatibility stack",
-        reason: "No verified working configuration exists yet, so another eligible stack should be tested.",
+        reason:
+          "No verified working configuration exists yet, so another eligible stack should be tested.",
         priority: 60,
       });
     }
@@ -94,7 +99,8 @@ export class MacCompatibilityRecoveryPlanner {
         id: "collect-more-evidence",
         action: "test",
         title: "Collect another diagnostic sample",
-        reason: "The current evidence is insufficient to choose a targeted correction safely.",
+        reason:
+          "The current evidence is insufficient to choose a targeted correction safely.",
         priority: 50,
       });
     }

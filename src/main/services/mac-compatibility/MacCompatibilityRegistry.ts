@@ -88,11 +88,16 @@ export class MacCompatibilityRegistry {
     await this.persistQueue;
   }
 
-  public get(key: MacCompatibilityGameKey): MacCompatibilityRegistryEntry | null {
+  public get(
+    key: MacCompatibilityGameKey
+  ): MacCompatibilityRegistryEntry | null {
     return this.entries.get(this.getKey(key)) ?? null;
   }
 
-  public set(key: MacCompatibilityGameKey, entry: MacCompatibilityRegistryEntry): void {
+  public set(
+    key: MacCompatibilityGameKey,
+    entry: MacCompatibilityRegistryEntry
+  ): void {
     this.entries.set(this.getKey(key), entry);
     this.persist();
   }
@@ -107,7 +112,9 @@ export class MacCompatibilityRegistry {
     return this.entries.has(this.getKey(key));
   }
 
-  public getEnvironment(key: MacCompatibilityGameKey): MacWineEnvironment | null {
+  public getEnvironment(
+    key: MacCompatibilityGameKey
+  ): MacWineEnvironment | null {
     return this.get(key)?.environment ?? null;
   }
 
@@ -140,7 +147,10 @@ export class MacCompatibilityRegistry {
     });
   }
 
-  public setStatus(key: MacCompatibilityGameKey, status: MacCompatibilityStatus): void {
+  public setStatus(
+    key: MacCompatibilityGameKey,
+    status: MacCompatibilityStatus
+  ): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -167,7 +177,10 @@ export class MacCompatibilityRegistry {
     });
   }
 
-  public setWineVersion(key: MacCompatibilityGameKey, wineVersionId: string | null): void {
+  public setWineVersion(
+    key: MacCompatibilityGameKey,
+    wineVersionId: string | null
+  ): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -197,7 +210,10 @@ export class MacCompatibilityRegistry {
     return this.get(key)?.selectedStack?.id ?? null;
   }
 
-  public setSelectedStack(key: MacCompatibilityGameKey, stack: MacCompatibilityStack | null): void {
+  public setSelectedStack(
+    key: MacCompatibilityGameKey,
+    stack: MacCompatibilityStack | null
+  ): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -223,11 +239,16 @@ export class MacCompatibilityRegistry {
     });
   }
 
-  public getExperiments(key: MacCompatibilityGameKey): MacCompatibilityExperiment[] {
+  public getExperiments(
+    key: MacCompatibilityGameKey
+  ): MacCompatibilityExperiment[] {
     return [...(this.get(key)?.experiments ?? [])];
   }
 
-  public addExperiment(key: MacCompatibilityGameKey, experiment: MacCompatibilityExperiment): void {
+  public addExperiment(
+    key: MacCompatibilityGameKey,
+    experiment: MacCompatibilityExperiment
+  ): void {
     const existing = this.get(key);
 
     if (existing) {
@@ -302,7 +323,9 @@ export class MacCompatibilityRegistry {
     });
   }
 
-  public getLastKnownGood(key: MacCompatibilityGameKey): MacCompatibilityLastKnownGood | null {
+  public getLastKnownGood(
+    key: MacCompatibilityGameKey
+  ): MacCompatibilityLastKnownGood | null {
     return this.get(key)?.lastKnownGood ?? null;
   }
 
@@ -335,7 +358,9 @@ export class MacCompatibilityRegistry {
     });
   }
 
-  public getDiagnostics(key: MacCompatibilityGameKey): MacCompatibilityDiagnosticRecord[] {
+  public getDiagnostics(
+    key: MacCompatibilityGameKey
+  ): MacCompatibilityDiagnosticRecord[] {
     return [...(this.get(key)?.diagnostics ?? [])];
   }
 

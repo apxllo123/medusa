@@ -1,12 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type {
-  MacCompatibilityDiagnosticRecord,
-} from "./MacCompatibilityTypes.ts";
+import type { MacCompatibilityDiagnosticRecord } from "./MacCompatibilityTypes.ts";
 import type { MacScreenObservationResult } from "./MacScreenObservationTypes.ts";
-import {
-  MacCompatibilityWorkingStateVerifier,
-} from "./MacCompatibilityWorkingStateVerifier.ts";
+import { MacCompatibilityWorkingStateVerifier } from "./MacCompatibilityWorkingStateVerifier.ts";
 
 const observation = (
   overrides: Partial<MacScreenObservationResult> = {}

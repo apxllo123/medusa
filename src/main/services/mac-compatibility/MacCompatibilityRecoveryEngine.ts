@@ -124,7 +124,9 @@ export class MacCompatibilityRecoveryEngine {
         );
 
         if (!provision.success || !provision.environment) {
-          const failureSignature = provision.message.toUpperCase().slice(0, 1_000);
+          const failureSignature = provision.message
+            .toUpperCase()
+            .slice(0, 1_000);
           this.experimentManager.markFailed(
             request.game,
             experiment.id,
@@ -164,13 +166,14 @@ export class MacCompatibilityRecoveryEngine {
           continue;
         }
 
-        const launch = await this.launchManager.launchInCompatibilityEnvironment(
-          request,
-          compatibility,
-          provision.environment,
-          wineVersion,
-          candidate.stack
-        );
+        const launch =
+          await this.launchManager.launchInCompatibilityEnvironment(
+            request,
+            compatibility,
+            provision.environment,
+            wineVersion,
+            candidate.stack
+          );
 
         await this.delay(STARTUP_OBSERVATION_DELAY_MS);
 
@@ -180,7 +183,9 @@ export class MacCompatibilityRecoveryEngine {
               this.processLogger.read(launch.logPaths.stderr)
             )
           : [];
-        const priorDiagnostics = this.experimentManager.getDiagnostics(request.game);
+        const priorDiagnostics = this.experimentManager.getDiagnostics(
+          request.game
+        );
         const screenObservation = await this.workingStateVerifier.verify(
           request.game.shop,
           request.game.objectId,
@@ -281,7 +286,8 @@ export class MacCompatibilityRecoveryEngine {
     analysis: Awaited<ReturnType<MacCompatibilityAnalyzer["analyze"]>>
   ): MacGameCompatibility {
     const selected =
-      analysis.candidates.find((candidate) => candidate.eligible)?.stack ?? null;
+      analysis.candidates.find((candidate) => candidate.eligible)?.stack ??
+      null;
 
     return {
       shop: request.game.shop,
