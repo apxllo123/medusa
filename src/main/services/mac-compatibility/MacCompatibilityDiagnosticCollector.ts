@@ -94,9 +94,7 @@ export function createScreenDiagnosticEvidence(
       text: observation.combinedText,
       timestamp: new Date().toISOString(),
       confidence: observation.observations.length
-        ? Math.max(
-            ...observation.observations.map((item) => item.confidence)
-          )
+        ? Math.max(...observation.observations.map((item) => item.confidence))
         : 0.5,
     },
   ];

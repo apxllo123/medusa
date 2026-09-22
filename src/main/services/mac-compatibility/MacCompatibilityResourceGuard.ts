@@ -3,10 +3,11 @@ export interface MacCompatibilityResourceBudget {
   minimumFreeDiskBytes: number;
 }
 
-export const DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET: MacCompatibilityResourceBudget = {
-  maxConcurrentExperiments: 1,
-  minimumFreeDiskBytes: 8 * 1024 ** 3,
-};
+export const DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET: MacCompatibilityResourceBudget =
+  {
+    maxConcurrentExperiments: 1,
+    minimumFreeDiskBytes: 8 * 1024 ** 3,
+  };
 
 /**
  * Small in-process guard for expensive compatibility experiments. The first
@@ -19,8 +20,7 @@ export class MacCompatibilityResourceGuard {
   private readonly budget: MacCompatibilityResourceBudget;
 
   constructor(
-    budget: MacCompatibilityResourceBudget =
-      DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET
+    budget: MacCompatibilityResourceBudget = DEFAULT_MAC_COMPATIBILITY_RESOURCE_BUDGET
   ) {
     this.budget = budget;
   }

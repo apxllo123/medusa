@@ -7,7 +7,7 @@ const patterns = [
   /process\.platform\s*===\s*["']win32["']/,
   /process\.platform\s*===\s*["']linux["']/,
   /path\.win32/,
-  /\\\\\\\\\\\\\\\\\\\\\\\\/, 
+  /\\\\\\\\\\\\\\\\\\\\\\\\/,
   /\.exe\b/i,
   /\.dll\b/i,
   /wineprefix/i,
@@ -33,7 +33,11 @@ for (const relativeRoot of sourceRoots) {
     const lines = text.split(/\r?\n/);
     lines.forEach((line, index) => {
       if (patterns.some((pattern) => pattern.test(line))) {
-        findings.push({ file: path.relative(root, file), line: index + 1, text: line.trim() });
+        findings.push({
+          file: path.relative(root, file),
+          line: index + 1,
+          text: line.trim(),
+        });
       }
     });
   }

@@ -47,7 +47,10 @@ describe("MacCompatibilityRecoveryPlanner", () => {
 
   it("falls back to collecting evidence when nothing actionable is known", () => {
     const planner = new MacCompatibilityRecoveryPlanner();
-    const candidates = planner.plan([diagnostic("unknown startup message")], true);
+    const candidates = planner.plan(
+      [diagnostic("unknown startup message")],
+      true
+    );
 
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0]?.action, "test");

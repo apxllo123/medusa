@@ -75,8 +75,9 @@ describe("MacCompatibilityComponentDetector", () => {
     const detector = new MacCompatibilityComponentDetector(run);
     const components = await detector.discoverInstalledComponents("arm64");
 
-    assert.deepEqual(components.map((component) => component.id), [
-      "apple-metal-compiler",
-    ]);
+    assert.deepEqual(
+      components.map((component) => component.id),
+      ["apple-metal-compiler"]
+    );
   });
 });

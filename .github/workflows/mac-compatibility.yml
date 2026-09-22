@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
-      - 'compatibility/**'
+      - "compatibility/**"
   pull_request:
     branches:
       - main
+      - "compatibility/**"
   workflow_dispatch:
 
 jobs:

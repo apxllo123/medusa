@@ -45,10 +45,7 @@ const getHydraDeckyPluginInfo = async (
     }
 
     // Check if package.json exists
-    const packageJsonPath = path.join(
-      DECKY_PLUGIN_LOCATION,
-      "package.json"
-    );
+    const packageJsonPath = path.join(DECKY_PLUGIN_LOCATION, "package.json");
 
     if (!fs.existsSync(packageJsonPath)) {
       logger.log("Medusa Decky plugin package.json not found");
