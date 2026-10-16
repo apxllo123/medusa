@@ -10,4 +10,6 @@ jobs:
 
     steps:
       - name: Trigger Landing Page build
-        run: curl --location --request POST '${{ secrets.LP_TRIGGER_DEPLOY_URL }}'
+        env:
+          LP_TRIGGER_DEPLOY_URL: ${{ secrets.LP_TRIGGER_DEPLOY_URL }}
+        run: curl --fail-with-body --location --request POST "$LP_TRIGGER_DEPLOY_URL"
