@@ -88,8 +88,11 @@ export function App() {
     clearUserDetails,
   } = useUserDetails();
 
-  const { hideMedusaCloudModal, isMedusaCloudModalVisible, medusaCloudFeature } =
-    useSubscription();
+  const {
+    hideMedusaCloudModal,
+    isMedusaCloudModalVisible,
+    medusaCloudFeature,
+  } = useSubscription();
 
   const dispatch = useAppDispatch();
 
